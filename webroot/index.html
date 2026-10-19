@@ -1021,7 +1021,7 @@
       <div>
         <h1>D-bloater</h1><small>by zennnez · <span id="mode">…</span></small>
       </div>
-      <span class="b" id="hVerBadge">v1.4.2 (8)</span>
+      <span class="b" id="hVerBadge">—</span>
     </div>
 
     <div id="homeBanner" class="box" hidden></div>
@@ -1050,20 +1050,16 @@
       </div>
     </div>
 
-
-
     <div class="sec-card" id="updatePanel">
       <div class="sec-head" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Updates &amp; Releases</span>
+        <span>Updates</span>
         <button class="btn" id="btnCheckUpdate" style="padding:4px 10px;font-size:12px">Check now</button>
       </div>
-      <div id="updateStatus" class="kv" style="margin-bottom:6px">Current version: v1.4.2</div>
+      <div id="updateStatus" class="kv" style="margin-bottom:6px">Checking version…</div>
       <div id="updateChangelog" style="margin:6px 0"></div>
-      <div id="updateCommits" style="font-size:12px;margin:6px 0;line-height:1.4;color:var(--mut)"></div>
       <div class="row" style="margin-top:10px">
-        <a class="btn pri" id="btnDlUpdate" href="" target="_blank" hidden>Download Update</a>
-        <a class="btn" id="btnCheckGithub" href="https://github.com/zennnez/D-bloater/releases" target="_blank">Check
-          GitHub</a>
+        <a class="btn pri" id="btnDlUpdate" href="#" data-url="" target="_blank" hidden>Download Update</a>
+        <a class="btn" id="btnCheckGithub" href="https://github.com/zennnez/D-bloater/releases" target="_blank">Check GitHub</a>
         <a class="btn" id="btnCheckTelegram" href="https://t.me/kokernel" target="_blank">Check Telegram</a>
       </div>
     </div>
@@ -1223,7 +1219,7 @@
     <div class="sec-card">
       <div class="sec-head">System Operations</div>
       <div class="row" style="margin-top:0">
-        <button class="btn warn" id="sBtnSoft">Soft reboot (Fast restart)</button>
+        <button class="btn warn" id="sBtnSoft">Soft reboot</button>
         <button class="btn warn" id="sBtnReboot">Full device reboot</button>
         <button class="btn bad" id="sBtnRestore">Restore everything</button>
       </div>
@@ -1296,6 +1292,7 @@
     const S = {
       pkgs: [], byId: new Map(), db: new Map(),
       sel: new Set(),
+      version: '', versionCode: '',
       q: '', risk: 'all', state: 'all', list: 'all', sort: 'name', sortDir: 1,
       showCritical: false, shown: PAGE,
       opt: { size: false, running: true, icons: true, used: false, backup: false, autoupd: true },
@@ -1382,7 +1379,7 @@
       const args = m && m[2] ? m[2].trim().split(/\s+/) : [];
       const ok = (stdout) => ({ errno: 0, stdout, stderr: '' });
       if (c === 'scan') {
-        let o = '##ALL\n';
+        let o = '##MOD\nversion=v1.5.0\nversionCode=9\n##ALL\n';
         mock.state.forEach((st, id) => {
           const pre = id.indexOf('oneplus') >= 0 || id.indexOf('oplus') >= 0 ? '/product/priv-app/' : '/system/app/';
           o += 'package:' + pre + id.split('.').pop() + '/base.apk=' + id + '\n';
@@ -1408,6 +1405,7 @@
       }
       if (c === 'log') return ok(mock.log.join('\n') || '(empty)');
       if (c === 'diag') return ok('(demo mode: no device to diagnose)');
+      if (c === 'prop') return ok('id=dbloater\nname=D-bloater\nversion=v1.5.0\nversionCode=9\nauthor=zennnez\ndescription=WebUI debloater for system apps\n');
       if (c === 'graph') return ok('##UID\npackage:com.google.android.apps.docs uid:10201\npackage:com.google.android.apps.docs.editors.docs uid:10201\npackage:com.google.android.youtube uid:10305\n##ROLE\nSMS com.google.android.apps.messaging\nDIALER com.google.android.dialer\n##SET\ndefault_input_method=com.google.android.inputmethod.latin/.LatinIME\nenabled_accessibility_services=com.google.android.marvin.talkback/.TalkBackService\n##OVL\ncom.google.android.youtube\n[x] com.google.android.youtube.overlay.demo\n##END\n');
       if (c === 'backup') return ok('OK|backup|3 archive(s) copied (demo)\n');
       if (c === 'softreboot') return ok('');
@@ -1819,7 +1817,7 @@
 
     /* ------------------------------------------------------------------ scan */
     function parseScan(out) {
-      const sec = { ALL: [], INST: [], DIS: [], SYSRM: [], BOOT: [], BACKUP: [] };
+      const sec = { ALL: [], INST: [], DIS: [], SYSRM: [], BOOT: [], BACKUP: [], MOD: [] };
       let cur = null;
       out.split('\n').forEach(raw => {
         const l = raw.trim();
@@ -1828,6 +1826,16 @@
         if (m) { cur = m[1]; return; }
         if (cur && sec[cur]) sec[cur].push(l);
       });
+      (sec.MOD || []).forEach(l => {
+        const m = l.match(/^(\w+)=(.*)$/);
+        if (m) {
+          if (m[1] === 'version') S.version = m[2].trim();
+          if (m[1] === 'versionCode') S.versionCode = m[2].trim();
+          if (m[1] === 'name') S.name = m[2].trim();
+          if (m[1] === 'author') S.author = m[2].trim();
+        }
+      });
+      applyModuleProp();
       const inst = new Set(), dis = new Set(), sysrm = new Map(), backups = new Set();
       sec.INST.forEach(l => { const m = l.match(/^package:([\w.]+)$/); if (m) inst.add(m[1]); });
       sec.DIS.forEach(l => { const m = l.match(/^package:([\w.]+)$/); if (m) dis.add(m[1]); });
@@ -2691,25 +2699,102 @@
       }
     });
 
-    // Home tab wiring
+    // Dynamic module properties & version management
+    function applyModuleProp() {
+      const verEl = $('#hVerBadge');
+      if (verEl && S.version) verEl.textContent = S.version + (S.versionCode ? ' (' + S.versionCode + ')' : '');
+      const statEl = $('#updateStatus');
+      if (statEl && S.version && !statEl.innerHTML.includes('Update available')) {
+        statEl.textContent = 'Current version: ' + S.version;
+      }
+    }
+
+    async function loadModuleProp() {
+      let text = '';
+      if (HAS_KSU) {
+        try {
+          const r = await exec(BIN + ' prop');
+          if (r && r.stdout && r.stdout.includes('version=')) text = r.stdout;
+        } catch (e) {}
+      }
+      if (!text) {
+        try {
+          const res = await fetch('../module.prop');
+          if (res.ok) text = await res.text();
+        } catch (e) {}
+      }
+      if (text) {
+        text.split('\n').forEach(line => {
+          const m = line.trim().match(/^(\w+)=(.*)$/);
+          if (m) {
+            if (m[1] === 'version') S.version = m[2].trim();
+            if (m[1] === 'versionCode') S.versionCode = m[2].trim();
+            if (m[1] === 'name') S.name = m[2].trim();
+            if (m[1] === 'author') S.author = m[2].trim();
+            if (m[1] === 'description') S.desc = m[2].trim();
+          }
+        });
+        applyModuleProp();
+      }
+    }
+
+    function isVersionNewer(remoteTag, localTag) {
+      if (!remoteTag || !localTag) return false;
+      const parse = v => v.replace(/^v/i, '').split(/[-+.]/).map(x => parseInt(x, 10) || 0);
+      const r = parse(remoteTag), l = parse(localTag);
+      for (let i = 0; i < Math.max(r.length, l.length); i++) {
+        const rv = r[i] || 0, lv = l[i] || 0;
+        if (rv > lv) return true;
+        if (rv < lv) return false;
+      }
+      return false;
+    }
+
+    function openUrl(url) {
+      if (!url) return;
+      if (HAS_KSU) {
+        exec("am start -a android.intent.action.VIEW -d '" + url.replace(/'/g, "'\\''") + "'");
+      } else {
+        window.open(url, '_blank');
+      }
+    }
+
     async function checkUpdates() {
-      const statusEl = $('#updateStatus'), commEl = $('#updateCommits'), clEl = $('#updateChangelog'), dlBtn = $('#btnDlUpdate');
+      const statusEl = $('#updateStatus'), clEl = $('#updateChangelog'), dlBtn = $('#btnDlUpdate');
+      if (!S.version) await loadModuleProp();
+      const localVer = S.version || '';
       if (statusEl) statusEl.textContent = 'Checking GitHub for updates…';
+      if (dlBtn) {
+        dlBtn.hidden = true;
+        dlBtn.dataset.url = '';
+        dlBtn.setAttribute('href', '#');
+      }
       try {
-        const relP = fetchJson('https://api.github.com/repos/zennnez/D-bloater/releases/latest').catch(() => null);
-        const comP = fetchJson('https://api.github.com/repos/zennnez/D-bloater/commits?per_page=4').catch(() => null);
-        const [rel, coms] = await Promise.all([relP, comP]);
+        const rel = await fetchJson('https://api.github.com/repos/zennnez/D-bloater/releases/latest');
         if (rel && rel.tag_name) {
-          const isNewer = rel.tag_name !== 'v1.4.2';
-          if (statusEl) statusEl.innerHTML = (isNewer ? '<b style="color:var(--safe)">Update available: ' + esc(rel.tag_name) + '</b>' : 'Up to date (' + esc(rel.tag_name) + ')') + (rel.name ? ' · ' + esc(rel.name) : '');
+          const isNewer = localVer ? isVersionNewer(rel.tag_name, localVer) : false;
+          if (statusEl) {
+            statusEl.innerHTML = (isNewer ? '<b style="color:var(--safe)">Update available: ' + esc(rel.tag_name) + '</b>' : 'Up to date (' + esc(rel.tag_name) + ')') + (rel.name ? ' · ' + esc(rel.name) : '');
+          }
           if (dlBtn) {
             if (isNewer) {
+              const tag = rel.tag_name.trim();
+              let dlUrl = '';
+              if (Array.isArray(rel.assets)) {
+                const zipAsset = rel.assets.find(a => (a.name || '').endsWith('.zip'));
+                if (zipAsset && zipAsset.browser_download_url) dlUrl = zipAsset.browser_download_url;
+              }
+              if (!dlUrl) {
+                dlUrl = 'https://github.com/zennnez/D-bloater/releases/download/' + tag + '/D-bloater-' + tag + '.zip';
+              }
               dlBtn.hidden = false;
-              const zipAsset = Array.isArray(rel.assets) && rel.assets.find(a => (a.name || '').endsWith('.zip'));
-              dlBtn.href = zipAsset ? zipAsset.browser_download_url : (rel.assets && rel.assets[0] ? rel.assets[0].browser_download_url : rel.html_url);
-              dlBtn.textContent = 'Download ' + rel.tag_name;
+              dlBtn.dataset.url = dlUrl;
+              dlBtn.setAttribute('href', dlUrl);
+              dlBtn.textContent = 'Download ' + tag;
             } else {
               dlBtn.hidden = true;
+              dlBtn.dataset.url = '';
+              dlBtn.setAttribute('href', '#');
             }
           }
           if (clEl) {
@@ -2720,21 +2805,52 @@
             }
           }
         } else if (statusEl) {
-          statusEl.textContent = 'Current version: v1.4.2 (up to date)';
-          if (dlBtn) dlBtn.hidden = true;
+          statusEl.textContent = 'Current version: ' + (localVer || 'unknown') + ' (up to date)';
+          if (dlBtn) {
+            dlBtn.hidden = true;
+            dlBtn.dataset.url = '';
+            dlBtn.setAttribute('href', '#');
+          }
           if (clEl) clEl.innerHTML = '';
         }
-        if (Array.isArray(coms) && coms.length && commEl) {
-          commEl.innerHTML = '<div style="margin:4px 0 2px;font-weight:600">Recent commits:</div><ul class="dep">' +
-            coms.map(c => '<li><code>' + esc(c.sha.slice(0, 7)) + '</code> ' + esc(c.commit.message.split('\n')[0]) + ' <span class="mut">(' + esc((c.commit.author && c.commit.author.date || '').slice(0, 10)) + ')</span></li>').join('') +
-            '</ul>';
-        }
       } catch (e) {
-        if (statusEl) statusEl.textContent = 'Could not reach GitHub (offline)';
+        if (statusEl) statusEl.textContent = localVer ? 'Current version: ' + localVer + ' (offline)' : 'Could not reach GitHub (offline)';
+        if (dlBtn) {
+          dlBtn.hidden = true;
+          dlBtn.dataset.url = '';
+          dlBtn.setAttribute('href', '#');
+        }
       }
     }
     const btnCheck = $('#btnCheckUpdate');
     if (btnCheck) btnCheck.onclick = checkUpdates;
+    const btnDl = $('#btnDlUpdate');
+    if (btnDl) {
+      btnDl.onclick = (e) => {
+        e.preventDefault();
+        const url = btnDl.dataset.url || btnDl.getAttribute('href');
+        if (url && url.startsWith('http')) {
+          toast('Opening download…');
+          openUrl(url);
+        }
+      };
+    }
+    const btnGh = $('#btnCheckGithub');
+    if (btnGh) {
+      btnGh.onclick = (e) => {
+        e.preventDefault();
+        const url = btnGh.getAttribute('href');
+        if (url && url.startsWith('http')) openUrl(url);
+      };
+    }
+    const btnTg = $('#btnCheckTelegram');
+    if (btnTg) {
+      btnTg.onclick = (e) => {
+        e.preventDefault();
+        const url = btnTg.getAttribute('href');
+        if (url && url.startsWith('http')) openUrl(url);
+      };
+    }
 
     // Package lists tab wiring
     initPkglistEvents();
@@ -2774,6 +2890,7 @@
     renderSettings();
     buildDb();
     renderPkglist();
+    loadModuleProp();
     scan();
     checkUpdates();
   </script>
