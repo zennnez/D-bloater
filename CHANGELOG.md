@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.5.1 (2026-10-19)
+
+- v1.5.1 (3f569c3)
+- Add dynamic version and release updates (5c96db2)
+
 ## v1.4.2 (2026-10-19)
 
 - Modern bottom navigation with dedicated Home, Apps, Package Lists, and Settings views
