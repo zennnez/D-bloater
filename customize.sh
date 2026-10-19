@@ -16,7 +16,13 @@ mkdir -p /data/adb/dbloater/sysrm
 OLD=/data/adb/modules/dbloater
 if [ -d "$OLD/system" ]; then
   cp -af "$OLD/system" "$MODPATH/" 2>/dev/null && ui_print "- Kept existing systemless removals"
+  # Purge any dangling symlinks from older versions that broke partition overlays
+  rm -f "$MODPATH/system/product" "$MODPATH/system/system_ext" "$MODPATH/system/vendor" 2>/dev/null
 fi
+
+# Ensure /system/bin/dbl wrapper exists so CLI works in PATH and NoMount detects module as ACTIVE
+mkdir -p "$MODPATH/system/bin"
+ln -sf "$MODPATH/bin/dbl.sh" "$MODPATH/system/bin/dbl" 2>/dev/null || cp -f "$MODPATH/bin/dbl.sh" "$MODPATH/system/bin/dbl"
 
 # Records from older versions carry no boot id; stamp them so the WebUI can
 # tell "pending a reboot" from "rebooted but not applied"
@@ -29,6 +35,7 @@ done
 
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/bin/dbl.sh" 0 0 0755
+set_perm "$MODPATH/system/bin/dbl" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/post-fs-data.sh" 0 0 0755
 

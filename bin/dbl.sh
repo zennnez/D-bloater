@@ -26,7 +26,15 @@
 #
 # Output of action commands: one line per package -> STATUS|package|message
 
-MODDIR=${0%/*/*}
+MODDIR=${DBL_MODDIR:-}
+if [ -z "$MODDIR" ]; then
+  _m=${0%/*/*}
+  if [ -f "$_m/bin/dbl.sh" ]; then
+    MODDIR=$_m
+  else
+    MODDIR=/data/adb/modules/dbloater
+  fi
+fi
 DATA=${DBL_DATA:-/data/adb/dbloater}
 PATH=/data/adb/ksu/bin:/data/adb/ap/bin:/data/adb/magisk:$PATH
 export PATH
@@ -45,7 +53,7 @@ meta_name() {
   done
   return 1
 }
-boot_id() { cat /proc/sys/kernel/random/boot_id 2>/dev/null; }
+boot_id() { cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo "offline-boot"; }
 
 mkdir -p "$DATA/sysrm" 2>/dev/null
 LOG="$DATA/log.txt"
@@ -96,11 +104,9 @@ protected() {
 
 # Path of the APK for a package (works for packages removed for user 0 too)
 apk_path() {
-  pm list packages --user 0 -s -f -u 2>/dev/null | while IFS= read -r l; do
-    case "$l" in
-      *"=$1") p=${l#package:}; echo "${p%=$1}"; break ;;
-    esac
-  done
+  _l=$(pm list packages --user 0 -s -f -u 2>/dev/null | grep -E "=$1$" | head -n 1)
+  _l=${_l#package:}
+  echo "${_l%=$1}"
 }
 
 # Map an app dir on a real partition to its place inside the module
@@ -158,19 +164,30 @@ do_restore() {
 }
 
 # Work out where a package's folder is and how it would be hidden. No side effects.
-# Sets R_DIR (real folder), R_TGT (path inside this module), R_ERR (why not).
+# Sets R_DIR (real folder), R_TGT (path inside this module), R_UPDATE (1 if updated), R_ERR (why not).
 sysrm_resolve() {
-  R_DIR=""; R_TGT=""; R_ERR=""
+  R_DIR=""; R_TGT=""; R_UPDATE=0; R_ERR=""
   apk=$(apk_path "$1")
   [ -n "$apk" ] || { R_ERR="APK path not found"; return 1; }
   case "$apk" in
-    /data/*) R_ERR="has a user-installed update; uninstall the update first"; return 1 ;;
+    /data/*)
+      _base=$(dumpsys package "$1" 2>/dev/null | grep codePath | grep -v "/data/app" | head -n 1)
+      _base=${_base#*codePath=}
+      _base=$(echo "$_base" | tr -d ' \r\n')
+      if [ -n "$_base" ] && [ -d "$_base" ]; then
+        dir="$_base"
+        R_UPDATE=1
+      else
+        R_ERR="has a user-installed update; uninstall the update first"
+        return 1
+      fi
+      ;;
     /apex/*) R_ERR="APEX module, not removable"; return 1 ;;
+    *) dir=$(dirname "$apk") ;;
   esac
-  dir=$(dirname "$apk")
   parent=$(dirname "$dir")
   case "${parent##*/}" in
-    app|priv-app) : ;;
+    app|priv-app|overlay) : ;;
     *) R_ERR="unsupported layout ($dir)"; return 1 ;;
   esac
   tgt=$(sys_target "$dir") || { R_ERR="partition not supported systemless ($dir); use Uninstall instead"; return 1; }
@@ -189,7 +206,9 @@ sysrm_resolve() {
 # Dry run: PLAN|package|folder|how  or  ERR|package|reason
 do_plan() {
   if ! sysrm_resolve "$1"; then echo "ERR|$1|$R_ERR"; return; fi
-  if nm_bin >/dev/null; then how="NoMount whiteout rule at boot, plus module overlay"
+  if [ "$R_UPDATE" = 1 ]; then
+    how="user-installed update in /data will be uninstalled automatically, then hidden via NoMount"
+  elif nm_bin >/dev/null; then how="NoMount whiteout rule at boot, plus module overlay"
   elif _m=$(meta_name); then how="module overlay (.replace) mounted by metamodule $_m"
   else how="module overlay only, but NO metamodule is installed so it will NOT apply"; fi
   echo "PLAN|$1|$R_DIR|$how"
@@ -197,6 +216,11 @@ do_plan() {
 
 do_sysrm() {
   sysrm_resolve "$1" || { res ERR "$1" "$R_ERR"; return; }
+  if [ "$R_UPDATE" = 1 ]; then
+    pm uninstall "$1" >/dev/null 2>&1
+  fi
+  _part="${R_DIR#/}"; _part="${_part%%/*}"
+  [ -L "$MODDIR/system/$_part" ] && rm -f "$MODDIR/system/$_part"
   if mkdir -p "$R_TGT" && : > "$R_TGT/.replace"; then
     # Optional (Settings, Backups): once the rule is active the folder is hidden, so copy it now
     if [ "${DBL_BACKUP:-0}" = 1 ]; then
@@ -204,7 +228,9 @@ do_sysrm() {
       tar -cf "$DATA/backup/$1.tar" -C "$R_DIR" . 2>/dev/null || { rm -f "$DATA/backup/$1.tar"; log "backup of $1 failed (continuing)"; }
     fi
     { echo "$R_DIR"; boot_id; } > "$DATA/sysrm/$1"
-    if nm_bin >/dev/null; then
+    list_del "$REM" "$1"; list_del "$DIS" "$1"
+    if NM=$(nm_bin); then
+      "$NM" rule add --whiteout "$R_DIR" >/dev/null 2>&1
       res OK "$1" "queued (NoMount), reboot to apply"
     else
       res OK "$1" "queued, reboot to apply"
@@ -321,7 +347,7 @@ do_scan() {
 pkg_dir() {
   _d=${1%/*}
   _pd=${_d%/*}
-  case "${_pd##*/}" in app|priv-app) echo "$_d"; return ;; esac
+  case "${_pd##*/}" in app|priv-app|overlay) echo "$_d"; return ;; esac
   case "$1" in */data/app/*) echo "$_d" ;; esac
 }
 
@@ -513,7 +539,9 @@ do_softreboot() {
   for f in "$DATA"/sysrm/*; do
     [ -f "$f" ] || continue
     read -r _d < "$f"
-    { echo "$_d"; echo soft; } > "$f"
+    { echo "$_d"; echo soft; } > "$f.tmp"
+    touch -r "$f" "$f.tmp" 2>/dev/null
+    mv "$f.tmp" "$f"
   done
   log "soft reboot (framework restart)"
   setprop ctl.restart zygote

@@ -105,10 +105,21 @@ main{padding:10px 14px}
 .kv{font-size:12px;color:var(--mut);word-break:break-all}
 ul.dep{margin:6px 0 0;padding-left:18px;font-size:13px}
 pre.log{white-space:pre-wrap;word-break:break-all;font-size:11px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:55vh;overflow:auto}
-.menu{position:fixed;right:12px;top:calc(56px + env(safe-area-inset-top));z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;min-width:230px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+.menu{position:fixed;right:12px;top:calc(56px + env(safe-area-inset-top));z-index:30;background:var(--card);border:1px solid var(--line);border-radius:14px;min-width:240px;max-height:80vh;overflow-y:auto;box-shadow:0 12px 36px rgba(0,0,0,.45);animation:menuPop .15s cubic-bezier(0,0,.2,1)}
 .menu[hidden]{display:none}
-.menu button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 14px}
+@keyframes menuPop{from{opacity:0;transform:scale(.95) translateY(-6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.menu-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut);padding:8px 14px 4px;background:var(--card2);border-bottom:1px solid var(--line)}
+.menu-sec:not(:first-child){border-top:1px solid var(--line)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 14px;font-size:14px;cursor:pointer}
 .menu button:last-child{border-bottom:0}
+.menu button:active{background:var(--card2)}
+.switch{position:relative;width:42px;height:24px;flex:none;margin-top:2px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:.2s;cursor:pointer}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:var(--mut);border-radius:50%;transition:.2s}
+input:checked + .slider{background:var(--acc)}
+input:checked + .slider:before{transform:translateX(18px);background:var(--onacc)}
+.icon{display:flex;align-items:center;justify-content:center;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;max-width:88vw;opacity:0;pointer-events:none;transition:opacity .2s;text-align:center}
 #toast.show{opacity:1}
 #busy{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600}
@@ -124,7 +135,9 @@ textarea.inp{resize:vertical}
 <header>
   <div class="top">
     <div><h1>D-bloater</h1><small>by zennnez · <span id="mode">…</span><span id="lstat"></span></small></div>
-    <button class="icon" id="menuBtn" aria-label="Menu">⋮</button>
+    <button class="icon" id="menuBtn" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    </button>
   </div>
   <div class="stats" id="stats"></div>
   <input id="q" type="search" placeholder="Search name or package…" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -148,18 +161,23 @@ textarea.inp{resize:vertical}
 </div>
 
 <div class="menu" id="menu" hidden>
+  <div class="menu-sec">Selection</div>
+  <button data-m="selall">Select all visible</button>
+  <button data-m="selnone">Clear selection</button>
+  <div class="menu-sec">Configure &amp; Lists</div>
+  <button data-m="settings">Settings (features &amp; speed)…</button>
   <button data-m="update">Package list providers…</button>
   <button data-m="export">Export list…</button>
   <button data-m="import">Import list…</button>
-  <button data-m="settings">Settings…</button>
-  <button data-m="selsafe">Select all safe (visible)</button>
-  <button data-m="selnone">Clear selection</button>
-  <button data-m="crit" id="mCrit">Show critical packages</button>
-  <button data-m="log">View action log</button>
+  <div class="menu-sec">Diagnostics &amp; Backup</div>
   <button data-m="diag">Diagnose systemless…</button>
+  <button data-m="log">View action log</button>
   <button data-m="backup">Copy removal backups to /sdcard</button>
-  <button data-m="restoreall">Restore everything</button>
+  <div class="menu-sec">System Actions</div>
+  <button data-m="crit" id="mCrit">Show critical packages</button>
+  <button data-m="softreboot">Soft reboot (fast restart)</button>
   <button data-m="reboot">Reboot</button>
+  <button data-m="restoreall">Restore everything</button>
 </div>
 
 <div class="overlay" id="ov" hidden><div class="sheet" id="sheet"></div></div>
@@ -214,7 +232,7 @@ function syncSort() {
   fillSelect('#fSort', keys.map(k => [k, 'Sort: ' + SORTS[k][0]]), S.sort);
 }
 function openSettings() {
-  const row = (k, t, d) => '<label class="set"><input type="checkbox" data-o="' + k + '"' + (S.opt[k] ? ' checked' : '') + '><div><b>' + t + '</b><span>' + d + '</span></div></label>';
+  const row = (k, t, d) => '<label class="set"><div class="switch"><input type="checkbox" data-o="' + k + '"' + (S.opt[k] ? ' checked' : '') + '><span class="slider"></span></div><div><b>' + t + '</b><span>' + d + '</span></div></label>';
   sheet('<h2>Settings</h2><p class="mut">Turn on only what you need to make the list load faster. Saved on this device.</p>' +
     row('size', 'App sizes', 'APK and on-disk size. Off by default: this is the slowest part, because every app folder is measured.') +
     row('running', 'Running status', 'Checks live processes. Quick, but needs one extra command.') +
@@ -1177,9 +1195,10 @@ function openDetail(id) {
   const acts = [];
   const queued = p.state === 'sysrm-pending' || p.state === 'sysrm-failed';
   if (p.state === 'enabled' || queued) acts.push(['disable', 'Disable' + (queued ? ' instead' : ''), 'warn']);
+  const isApex = p.path && p.path.indexOf('/apex/') === 0;
   if (!p.protected) {
     if (p.state === 'enabled' || p.state === 'disabled' || queued) acts.push(['uninstall', 'Uninstall (user 0)' + (queued ? ' instead' : ''), 'bad']);
-    if (['enabled', 'disabled', 'removed'].indexOf(p.state) >= 0) acts.push(['sysrm', 'Systemless remove', 'bad']);
+    if (!isApex && ['enabled', 'disabled', 'removed'].indexOf(p.state) >= 0) acts.push(['sysrm', 'Systemless remove', 'bad']);
   }
   if (p.state !== 'enabled') acts.push(['restore', queued ? 'Cancel removal' : 'Restore', 'pri']);
   if (p.state.indexOf('sysrm') === 0) acts.push(['backuprestore', 'Reinstall from backup', '']);
@@ -1193,6 +1212,7 @@ function openDetail(id) {
     '<dt>Path</dt><dd>' + esc(p.path) + '</dd></dl>' +
     '<p>' + esc(d && d.desc ? d.desc : 'No description in the package list. Treat unlisted packages with care and prefer Disable first.') + '</p>' +
     (d && d.warn ? '<div class="box warn">⚠ ' + esc(d.warn) + '</div>' : '') +
+    (isApex ? '<div class="box">ℹ APEX module: cannot be removed systemlessly. Use Disable or Uninstall instead.</div>' : '') +
     (p.state === 'sysrm-failed' ? '<div class="box bad">⚠ Systemless removal did not apply after the reboot. Use Disable or Uninstall instead, or run Diagnose systemless from the menu.</div>' : '') +
     (p.protected ? '<div class="box bad">⚠ Critical system component. Disabling it can leave the device without UI, calls, or a working boot. Only Disable is allowed; Uninstall and Systemless remove are blocked. To undo from a PC: <code>adb shell pm enable ' + esc(p.id) + '</code></div>' : '') +
     '<div id="dGraph" data-for="' + esc(id) + '">' + graphHtml(p) + '</div>' +
@@ -1212,10 +1232,10 @@ function openDetail(id) {
 
 /* ------------------------------------------------------------------ actions */
 const ACTS = {
-  disable:   {label: 'Disable',            ok: s => s === 'enabled' || s === 'sysrm-pending' || s === 'sysrm-failed', note: 'Disables the app for user 0. Reversible instantly.', cls: 'warn'},
-  uninstall: {label: 'Uninstall (user 0)', ok: s => s === 'enabled' || s === 'disabled' || s === 'sysrm-pending' || s === 'sysrm-failed', note: 'Removes the app for the current user. The APK stays on /system, so Restore always works.', cls: 'bad'},
-  sysrm:     {label: 'Systemless remove',  ok: s => ['enabled', 'disabled', 'removed'].indexOf(s) >= 0, note: 'Hides the app folder using this module. Takes effect after a reboot. Not supported on every partition.', cls: 'bad'},
-  restore:   {label: 'Restore',            ok: s => s !== 'enabled',                                 note: 'Re-enables, reinstalls, or un-hides the selected apps.', cls: 'pri'}
+  disable:   {label: 'Disable',            ok: s => s !== 'disabled', note: 'Disables the app for user 0. Reversible instantly.', cls: 'warn'},
+  uninstall: {label: 'Uninstall (user 0)', ok: s => s !== 'removed',  note: 'Removes the app for the current user. The APK stays on /system, so Restore always works.', cls: 'bad'},
+  sysrm:     {label: 'Systemless remove',  ok: s => s !== 'sysrm',    note: 'Hides the app folder using this module. Takes effect after a reboot. Not supported on every partition.', cls: 'bad'},
+  restore:   {label: 'Restore',            ok: s => s !== 'enabled',  note: 'Re-enables, reinstalls, or un-hides the selected apps.', cls: 'pri'}
 };
 
 function restoreCmd(p) { return p.state === 'disabled' ? 'enable' : (p.state === 'removed' ? 'restore' : 'sysunrm'); }
@@ -1257,10 +1277,27 @@ async function act(kind, ids) {
       }
     } catch (e) { /* the real run still validates */ }
     if (plan.length) {
+      const validPlan = plan.filter(f => f[0] === 'PLAN');
+      const errPlan = plan.filter(f => f[0] === 'ERR');
+      if (!validPlan.length) {
+        const errIds = errPlan.map(f => f[1]);
+        const altU = errIds.filter(i => S.byId.has(i) && !S.byId.get(i).protected && S.byId.get(i).state !== 'removed');
+        const altD = errIds.filter(i => S.byId.has(i) && S.byId.get(i).state !== 'disabled');
+        sheet('<h2>Systemless removal not supported</h2><div class="box bad">' + errPlan.map(f => '<b>' + esc((S.byId.get(f[1]) || {}).label || f[1]) + '</b>: ' + esc(f[2])).join('<br>') + '</div>' +
+          '<p>These apps cannot be removed systemlessly (e.g. APEX modules). You can do it another way:</p>' +
+          '<div class="row">' +
+          (altD.length ? '<button class="btn warn" id="eDis">Disable' + (altD.length > 1 ? ' (' + altD.length + ')' : '') + '</button>' : '') +
+          (altU.length ? '<button class="btn bad" id="eUni">Uninstall' + (altU.length > 1 ? ' (' + altU.length + ')' : '') + '</button>' : '') +
+          '<button class="btn pri" id="eOk">Done</button></div>');
+        $('#eOk').onclick = closeSheet;
+        if (altD.length) $('#eDis').onclick = () => { closeSheet(); act('disable', altD); };
+        if (altU.length) $('#eUni').onclick = () => { closeSheet(); act('uninstall', altU); };
+        return;
+      }
       const nomap = plan.some(f => f[0] === 'PLAN' && /NO metamodule/.test(f[3] || ''));
       body += '<div class="box"><b>Dry run</b><ul class="dep">' + plan.slice(0, 8).map(f => {
         const p = S.byId.get(f[1]);
-        return '<li>' + esc(p ? p.label : f[1]) + '<br><span class="mut">' + (f[0] === 'PLAN' ? esc(f[2]) + '<br>' + esc(f[3]) : '<span class="r-unsafe">refused: ' + esc(f[2]) + '</span>') + '</span></li>';
+        return '<li>' + esc(p ? p.label : f[1]) + '<br><span class="mut">' + (f[0] === 'PLAN' ? esc(f[2]) + '<br>' + esc(f[3]) : '<span class="r-unsafe">skipped: ' + esc(f[2]) + '</span>') + '</span></li>';
       }).join('') + (plan.length > 8 ? '<li class="mut">…and ' + (plan.length - 8) + ' more</li>' : '') + '</ul></div>';
       if (nomap) body += '<div class="box bad">⚠ No metamodule is installed, so this removal will not apply. Install NoMount first.</div>';
     }
@@ -1305,14 +1342,14 @@ async function act(kind, ids) {
   if (bad.length) {
     // A systemless removal that failed can still be done another way
     const alt = kind === 'sysrm' ? [...new Set(badIds)].filter(i => S.byId.has(i)) : [];
-    const altU = alt.filter(i => !S.byId.get(i).protected && ACTS.uninstall.ok(S.byId.get(i).state));
-    const altD = alt.filter(i => ACTS.disable.ok(S.byId.get(i).state));
+    const altU = alt.filter(i => !S.byId.get(i).protected && S.byId.get(i).state !== 'removed');
+    const altD = alt.filter(i => S.byId.get(i).state !== 'disabled');
     sheet('<h2>' + good + ' done, ' + bad.length + ' failed</h2><div class="box bad">' + bad.slice(0, 12).map(esc).join('<br>') + (bad.length > 12 ? '<br>…' : '') + '</div>' +
       (alt.length ? '<p>Systemless removal did not work for ' + (alt.length > 1 ? 'these apps' : 'this app') + '. You can do it another way:</p>' : '') +
       '<div class="row">' +
-      (altD.length ? '<button class="btn warn" id="eDis">Disable ' + altD.length + '</button>' : '') +
-      (altU.length ? '<button class="btn bad" id="eUni">Uninstall ' + altU.length + '</button>' : '') +
-      '<button class="btn pri" id="eOk">OK</button></div>');
+      (altD.length ? '<button class="btn warn" id="eDis">Disable' + (altD.length > 1 ? ' (' + altD.length + ')' : '') + '</button>' : '') +
+      (altU.length ? '<button class="btn bad" id="eUni">Uninstall' + (altU.length > 1 ? ' (' + altU.length + ')' : '') + '</button>' : '') +
+      '<button class="btn pri" id="eOk">Done</button></div>');
     $('#eOk').onclick = closeSheet;
     if (altD.length) $('#eDis').onclick = () => { closeSheet(); act('disable', altD); };
     if (altU.length) $('#eUni').onclick = () => { closeSheet(); act('uninstall', altU); };
@@ -1412,13 +1449,14 @@ menu.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
   else if (m === 'update') openProviders();
   else if (m === 'export') openExport();
   else if (m === 'import') openImport();
-  else if (m === 'selsafe') { visible().forEach(p => { if (p.risk === 'safe' && p.state === 'enabled') S.sel.add(p.id); }); renderList(); renderBar(); }
+  else if (m === 'selall' || m === 'selsafe') { visible().forEach(p => S.sel.add(p.id)); renderList(); renderBar(); toast(S.sel.size + ' selected'); }
   else if (m === 'selnone') { S.sel.clear(); renderList(); renderBar(); }
   else if (m === 'crit') { S.showCritical = !S.showCritical; render(); }
   else if (m === 'log') showLog();
   else if (m === 'diag') showDiag();
   else if (m === 'backup') doBackup();
   else if (m === 'restoreall') restoreAll();
+  else if (m === 'softreboot') doSoftReboot();
   else if (m === 'reboot') doReboot();
 });
 
