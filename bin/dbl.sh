@@ -331,6 +331,12 @@ do_delbackup() {
 }
 
 do_scan() {
+  echo "##MOD"
+  if [ -f "$MODDIR/module.prop" ]; then
+    cat "$MODDIR/module.prop" 2>/dev/null
+  elif [ -f "/data/adb/modules/dbloater/module.prop" ]; then
+    cat "/data/adb/modules/dbloater/module.prop" 2>/dev/null
+  fi
   echo "##ALL"
   pm list packages --user 0 -s -f -u 2>/dev/null
   echo "##INST"
@@ -606,6 +612,13 @@ case "$cmd" in
   graph) do_graph ;;
   backup) do_backup ;;
   diag) do_diag ;;
+  prop)
+    if [ -f "$MODDIR/module.prop" ]; then
+      cat "$MODDIR/module.prop"
+    elif [ -f "/data/adb/modules/dbloater/module.prop" ]; then
+      cat "/data/adb/modules/dbloater/module.prop"
+    fi
+    ;;
   disable|enable|uninstall|restore|sysrm|sysunrm|plan|backuprestore|delbackup)
     for p in "$@"; do
       if ! valid "$p"; then

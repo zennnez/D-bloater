@@ -1,11 +1,12 @@
 # D-bloater
 
-[![Version](https://img.shields.io/badge/version-v1.4.1-blue)](../../releases/latest)
-[![Platform](https://img.shields.io/badge/KernelSU%20%7C%20APatch-WebUI%20module-green)](#requirements)
+[![Version](https://img.shields.io/badge/version-v1.5.0-blue)](../../releases/latest)
+[![Platform](https://img.shields.io/badge/KernelSU%20%7C%20APatch%20%7C%20SukiSU-WebUI%20module-green)](#requirements)
+[![Telegram](https://img.shields.io/badge/Telegram-Channel-2CA5E0?logo=telegram)](https://t.me/kokernel)
 
-A KernelSU / APatch module that lets you debloat system apps from a WebUI. Every app gets a **risk rating**, you can **filter and sort** by risk, size, running status and more, and everything you do is **reversible** with one tap.
+A root-based WebUI debloater for **KernelSU**, **APatch**, and **SukiSU**. Categorizes system apps with community **risk ratings**, highlights **dependencies**, and lets you debloat with one-tap reversible methods.
 
-Author: [zennnez](https://github.com/zennnez)
+Author: [zennnez](https://github.com/zennnez) · Community: [Telegram](https://t.me/kokernel)
 
 <p align="center">
   <img src="docs/screenshots/01-list.png" width="23%" alt="Package list with risk, size and running badges">
@@ -14,257 +15,97 @@ Author: [zennnez](https://github.com/zennnez)
   <img src="docs/screenshots/04-menu.png" width="23%" alt="Menu with providers, export and import">
 </p>
 
-<p align="center"><sub>Screenshots are taken in the WebUI's demo mode with simulated package data.</sub></p>
+---
 
 ## Features
 
-- **Risk ratings** for every package: Safe, Replace, Caution, Unsafe, Unknown, Critical.
-- **Filter** by risk, state (enabled, disabled, uninstalled, systemless), list (Google, AOSP, OEM, Carrier, Misc, Unlisted) and free-text search.
-- **App icons** on every card and in the details card, loaded lazily as you scroll. Apps without an icon show a coloured capital letter instead of the manager's generic placeholder.
-- **Settings** to turn app sizes, running status and icons on or off. App sizes are off by default so the list loads fast.
-- **Sort** by name, APK size, on-disk size, running status, risk, state, list, package name and more (13 options).
-- **App details** card with description, warnings, dependencies, APK size, on-disk size, live running status and APK path.
-- **Three removal methods**: Disable, Uninstall for user 0, or Systemless remove. All are undoable.
-- **Safety first**: confirmation sheet with dependency warnings and a dry run of exactly what a systemless removal will hide, an extra tick-box for risky packages, a protected Critical list and a bootloop guard that undoes the newest removal.
-- **Dependency graph**: the details card draws what needs the app and what it needs, and the confirm sheet lists the installed apps that would be affected, including indirectly. It also flags apps in use right now (launcher, phone, SMS, keyboard) and apps that share a user ID.
-- **Auto-updating lists**: package lists refresh in the background when the WebUI opens, if they are over 6 hours old.
-- **Soft reboot**: apply queued systemless removals by restarting the framework instead of the whole phone.
-- **Backups** (optional, **Settings, Backups**): save a copy of the app folder before each systemless removal; copy them to `/sdcard` and reinstall from them with one tap.
-- **Last used**: optional sort and badge from Android usage stats, to spot apps you never open.
-- **Package list providers**: add, remove, enable and update online lists. Supports the android-debloat-list and UAD-NG JSON formats.
-- **Export / import** your debloat list to and from internal storage.
-- **Re-applied at boot**: disabled and uninstalled apps are put back in that state after every boot, for example after an OTA.
+- **Bottom Navigation**: Fast navigation across **Home**, **Apps**, **Package Lists**, and **Settings**.
+- **System Overview**: 2×2 dashboard displaying enabled, disabled, uninstalled (user 0), and systemless counts.
+- **Risk Ratings**: Safe, Replace, Caution, Unsafe, Critical, and Unknown ratings for every system package.
+- **Three Reversible Actions**:
+  - **Disable**: Disables app for user 0 (`pm disable-user`). Instant restore.
+  - **Uninstall**: Uninstalls package for user 0 (`pm uninstall -k`). Instant restore.
+  - **Systemless Remove**: Hides app via metamodule whiteout rules (NoMount / `.replace`). Reversible upon reboot.
+- **Safety Safeguards**: Confirmation modal with dry-run paths, bootloop protection (auto-reverts on 3 failed boots), and critical system package protections.
+- **Dependency Graph**: Identifies default apps (launcher, phone, SMS, keyboard), shared UIDs, and overlay dependencies.
+- **Backups & Restore**: Back up app directories before systemless removal, restore with one tap, or export/import lists to `/sdcard/D-bloater/`.
+- **Search & Sort**: Filter by risk, state, or list provider, with ascending/descending directional sort toggle.
+- **Background Updates**: In-app update check with changelog preview and direct download.
+
+---
 
 ## Requirements
 
-- Android with root through **KernelSU** or **APatch**, using a manager that provides the WebUI bridge (`ksu.exec`). The module opens from its **WebUI** button.
-- Magisk has no built-in WebUI. A WebUI host app such as MMRL or KsuWebUI may work, but this is unverified.
-- **Systemless remove needs a metamodule.** Current KernelSU only mounts a module's `system/` folder through a metamodule. [NoMount](https://github.com/maxsteeel/nomount) is preferred; others that handle `.replace` (for example meta-overlayfs) also work. Without any metamodule the removal is queued but never applied.
-- Internet access is only needed for the optional online list providers.
+- Android with root via **KernelSU**, **APatch**, or **SukiSU** supporting WebUI.
+- For **Systemless removal**: A metamodule handling whiteouts/overlays (e.g. [NoMount](https://github.com/maxsteeel/nomount) recommended).
 
-<!-- TODO: list the devices / ROMs / manager versions you have tested on. -->
+---
 
-## Install
+## Quick Start
 
-1. Download `D-bloater-vX.Y.Z.zip` from the [latest release](../../releases/latest).
-2. In your KernelSU or APatch manager open **Modules**, choose **Install** and select the zip.
-3. **Reboot.** The module is activated on the next boot.
-4. Open **D-bloater** in the Modules list and tap its **WebUI** button.
+1. Download the latest `D-bloater-vX.Y.Z.zip` from [Releases](../../releases/latest).
+2. Install the zip in your root manager (KernelSU / APatch / SukiSU) and **reboot**.
+3. Open the manager's **Modules** tab and tap **WebUI** on D-bloater.
+4. Filter apps, review risk ratings and dependencies, and select your removal method.
 
-If the header says `demo mode (no KernelSU bridge)`, the page was opened outside a root manager and nothing will change on your device.
+---
 
-## Quick start
+## Removal Methods
 
-1. Wait for the scan to finish. Running status fills in a moment later. Sizes need **menu, Settings, App sizes**, which is off by default.
-2. Pick a filter, for example the **Safe** chip, and tap a card to read what the app does.
-3. Tick the apps you want to remove. The bottom bar shows how many are selected and their total APK size.
-4. Choose **Disable** first. Use Uninstall or Systemless only when you are sure.
-5. Not happy? Select the app again and tap **Restore**, or use **menu, Restore everything**.
-
-## Removal methods
-
-| Action | What it does | Undo |
+| Action | Mechanism | Undo |
 |---|---|---|
-| **Disable** | `pm disable-user --user 0`. The app stays installed but cannot run. | Restore, instant |
-| **Uninstall (user 0)** | `pm uninstall -k --user 0`. Removed for the main user, the APK stays on `/system`. | Restore, instant |
-| **Systemless remove** | Hides the app folder: a NoMount whiteout rule added at boot, plus a module overlay (`.replace`) for other metamodules. | Restore, then reboot |
+| **Disable** | `pm disable-user --user 0` | Re-enable instantly |
+| **Uninstall (user 0)** | `pm uninstall -k --user 0` | Reinstall instantly |
+| **Systemless remove** | Hides package folder via NoMount whiteout / overlay | Revert and reboot |
 
-Before you confirm, the sheet shows a **dry run**: the real folder, the partition and how it will be hidden (or why it is refused). Systemless removal is applied on the next boot, or immediately with the banner's **Soft reboot**, which adds the rules and restarts the framework so the package manager rescans. With NoMount, D-bloater adds the whiteout rule itself in `post-fs-data` (before the package manager scans), so it does not depend on how the metamodule reads `.replace`. After the reboot the card shows **Systemless removed**. If a systemless removal fails, either when it is queued or because it did not apply after the reboot, the result screen and the banner's **Fix…** button offer **Disable** or **Uninstall** instead (and **Cancel removal**). Switching a queued removal to Disable or Uninstall drops the queued removal first. **Soft reboot** needs NoMount; without it only a full reboot applies a removal. If the app is still listed after the reboot that followed your request, it shows **Not applied after reboot**; open **menu, Diagnose systemless** to see which link is missing (no metamodule, NoMount safe mode, rule not active, and so on).
+*Selections are preserved in `/data/adb/dbloater/` and re-applied after boot to survive OTAs.*
 
- It refuses packages it cannot hide safely: apps with a user-installed update, APEX modules, and layouts the overlay does not cover. OEM partitions such as `/my_product` (OnePlus/OPPO) or `/mi_ext` are supported only with NoMount. Use Uninstall for anything refused.
+---
 
-Your choices are stored in `/data/adb/dbloater/` and re-applied about 15 seconds after boot, so an OTA or app update cannot silently bring bloat back.
-
-## Dependency graph
-
-Open an app and look at **Dependencies**. An arrow means "needs": apps above the card need it, apps below are what it needs. Tap a node to open that app. Dashed boxes are not on this device.
-
-Two kinds of data feed it:
-
-- **Package lists.** If a list says A depends on B, B shows "needed by A" even when B's own entry is silent. Lists only cover some packages.
-- **Device facts**, read once per scan with `dbl.sh graph`: packages sharing a user ID (`pm list packages -U`), default-app roles (home, phone, SMS, browser, assistant and others, via `cmd role`), apps named as keyboard, accessibility service, notification listener or autofill in system settings, and overlays (`cmd overlay list`).
-
-The confirm sheet uses the same graph: it lists installed apps that need what you are about to remove (following the chain up to four steps), warns about shared user IDs, and asks for an extra tick-box when the app is currently your launcher, phone app, SMS app or keyboard.
-
-What it cannot see: runtime service and content-provider bindings, and `uses-library` links. Those are not available in a stable format from the shell.
-
-## Automatic list updates
-
-When the WebUI opens, each enabled provider whose copy is older than 6 hours is downloaded in the background. The header shows "updating lists…", and a short message appears only if something changed. It is skipped when offline or when data saver is on. Turn it off in **Settings, Update lists automatically**. **Package list providers** still updates on demand.
-
-## Last used
-
-**Settings, Last used** reads `dumpsys usagestats` and adds a "Used 12 days ago" badge plus two sort options (most recent first, longest ago first, with apps that have no data listed first). It is off by default because the dump is large. The format of that dump differs between Android versions; apps without a parsable entry show "No usage data".
-
-## Risk ratings
+## Risk Ratings
 
 | Rating | Meaning |
 |---|---|
-| **Safe** | Listed as safe to remove. |
-| **Replace** | Fine to remove once you have installed an alternative (keyboard, launcher, camera and so on). |
-| **Caution** | May break a feature. Read the warning first. |
-| **Unsafe** | Can break the system or cause a bootloop. You must tick an acknowledgement to continue. |
-| **Unknown** | Not in any enabled list. Prefer Disable. |
-| **Critical** | Built-in protected list. Hidden by default, can only be disabled, never uninstalled. |
+| **Safe** | Verified safe to remove without breaking functionality. |
+| **Replace** | Safe to remove once an alternative is installed (e.g., keyboard, browser). |
+| **Caution** | May break specific secondary features. Check dependencies first. |
+| **Unsafe** | Core dependency that can cause bootloops or instability. Requires extra confirmation. |
+| **Critical** | Protected OS components. Only disable is permitted; uninstall is blocked. |
+| **Unknown** | Unlisted package. Prefer Disable first. |
 
-When two lists disagree about a package, the **stricter rating wins**. Ratings from UAD-NG lists map as Recommended to Safe, Advanced and Expert to Caution, Unsafe to Unsafe.
+---
 
-### The Critical list
+## CLI Reference
 
-`android`, System UI, Phone, Settings, Bluetooth, Shell, Permission Controller, Package Installer, Keychain, Telecom server, Input devices, External storage, Fused location, Module metadata, `com.android.providers.*`, `com.android.networkstack*`, `com.android.wifi*`, `com.android.internal.*`, and the Google Permission Controller, Package Installer and Wi-Fi packages.
-
-Critical packages are hidden until you choose **menu, Show critical packages** or the **Critical** filter chip. You *can* disable them, behind a red warning and a tick-box, but Uninstall and Systemless remove are refused in both the UI and the backend. Disabling a core component can leave the device without UI, calls or a working boot. If that happens, from a PC:
+The WebUI interacts directly with `bin/dbl.sh`. You can execute commands from a root shell:
 
 ```sh
-adb shell pm enable --user 0 <package>
+su -c "sh /data/adb/modules/dbloater/bin/dbl.sh <command> [args...]"
 ```
 
-## Sizes, running status and sorting
-
-Sizes are the slowest part of loading, because every app folder is measured, so **App sizes are off by default**. Open **menu, Settings** to turn on **App sizes**, or to turn off **Running status** or **App icons**. A setting that is off skips that work entirely (with both sizes and running off, no extra command is run), hides the matching badges, details rows and sort options, and is remembered on the device.
-
-- **APK size** is the base APK plus any split APKs. **On disk** is the whole app folder (APK, native libraries, odex).
-- **Running** means a live process exists for the package. A process is matched to the installed package with the longest matching name prefix, so `com.google.android.gms.persistent` counts for Play Services. It is a good guide, not a guarantee, because a process can use an unrelated name. The details card re-checks it every time it opens. Disabled and uninstalled apps are never shown as running.
-- **Sort options**: Name A–Z / Z–A, APK size largest / smallest first, on-disk size, running first / not running first, risk safest / riskiest first, state, list / source, listed packages first, package name. Packages with an unknown size always sort last.
-
-## App icons
-
-Each card carries an `<img src="ksu://icon/<package>">`, the address the KernelSU WebUI API documents for app icons. An image is requested only when its card nears the screen. If the manager cannot supply an icon, that card simply shows no icon. Nothing else is substituted. Icons need a manager that implements `ksu://icon/` and appear only inside the manager's WebUI, not in a plain browser. Turn icons off in **Settings** to save memory on long lists.
-
-## Package lists and providers
-
-A curated list of **193 entries** (Google 53, AOSP 55, OEM 62, Carrier 5, Misc 18) is bundled in `webroot/db.js` and is always used, so the module works offline.
-
-Open **menu, Package list providers** to manage online lists:
-
-- The default provider is [MuntashirAkon/android-debloat-list](https://github.com/MuntashirAkon/android-debloat-list).
-- **Add** a provider with one or more HTTPS JSON URLs. Both the android-debloat-list format (an array of objects) and the UAD-NG format (an object keyed by package name) are accepted. For example, the UAD-NG list is `https://raw.githubusercontent.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation/main/resources/assets/uad_lists.json`.
-- **Turn off**, **update** or **delete** any provider. Downloaded entries are cached, and a provider is only added if its first download succeeds.
-- Each app's details card shows which providers list it.
-
-Online lists are downloaded at runtime and are not redistributed in this repository.
-
-## Export and import
-
-**Menu, Export list** writes a JSON file to `/sdcard/D-bloater/` containing your selected apps, the apps already debloated, or both. **Menu, Import list** reads any `.json` or `.txt` file from that folder, or pasted text, and lets you select the matching apps or apply the saved actions through the normal confirmation sheet. Protected packages and packages that are not on the device are skipped.
-
-```json
-{
-  "app": "D-bloater",
-  "format": 1,
-  "created": "2026-10-18T03:00:00.000Z",
-  "packages": [
-    { "id": "com.android.egg", "label": "Android Easter Egg", "action": "disable" },
-    { "id": "com.google.android.videos", "label": "Google TV", "action": "uninstall" }
-  ]
-}
-```
-
-`action` is one of `disable`, `uninstall`, `sysrm` or `select` (select only, no action). A plain text file also works, with one package name per line. Lines starting with `#` are ignored. Plain text entries are selected only, with no saved action.
-
-## Safety and recovery
-
-- **Confirmation first**: every action shows what will happen, dependency warnings and a rating summary before anything runs.
-- **Backend checks**: package names are validated, and the Critical list is enforced in `bin/dbl.sh`, not only in the UI.
-- **Bootloop guard**: if the device fails to finish booting 3 times in a row while systemless removals exist, the newest removal is undone automatically, and again after 3 more failed boots, until the device boots. With **Settings, Backups** on, a copy of every removed app folder is kept in `/data/adb/dbloater/backup/`; **menu, Copy removal backups** copies them to `/sdcard/D-bloater/backup/`, and an app's details card has **Reinstall from backup**.
-- **Manual recovery** from recovery or adb: delete `/data/adb/modules/dbloater`, or create an empty file named `disable` inside it.
-- **Before uninstalling the module**, use **menu, Restore everything** so disabled and uninstalled apps come back.
-
-Removing system apps can affect updates, features and stability. Back up your data first and use Disable before anything stronger.
-
-## Command line
-
-The WebUI is a front end for `bin/dbl.sh`. You can use it from a root shell:
-
-```sh
-su -c "sh /data/adb/modules/dbloater/bin/dbl.sh <command> [package ...]"
-```
-
-| Command | Purpose |
+| Command | Action |
 |---|---|
-| `scan` | Dump package state |
-| `info [size] [running]` | APK size, on-disk size and running processes (no words means both) |
-| `running` | Running processes only |
-| `disable` / `enable` | `pm disable-user` / `pm enable` for user 0 |
-| `uninstall` / `restore` | Uninstall for user 0 / bring it back |
-| `sysrm` / `sysunrm` | Queue / undo a systemless removal |
-| `restoreall` | Undo everything D-bloater has done |
-| `reapply` | Re-apply saved states (run automatically at boot) |
-| `plan <pkg>` | Dry run of a systemless removal |
-| `diag` | Explain why a systemless removal did or did not apply |
-| `softreboot` | Apply queued removals now by restarting the framework |
-| `backup` / `backuprestore <pkg>` | Copy removal backups to `/sdcard` / reinstall one |
-| `usage` | Raw last-used lines (used by the WebUI) |
-| `graph` | Device facts for the dependency graph |
-| `log` | Show the action log |
-| `files` / `readfile` / `writefile` | List, read and write import and export files |
+| `scan` | Scan installed packages and current debloat states |
+| `info` | Read APK sizes and running processes |
+| `disable` / `enable` | Disable / re-enable package for user 0 |
+| `uninstall` / `restore` | Uninstall / restore package for user 0 |
+| `sysrm` / `sysunrm` | Queue / cancel systemless removal |
+| `plan <pkg>` | Dry run showing target partition and mount strategy |
+| `softreboot` | Restart framework to apply pending NoMount rules |
+| `restoreall` | Restore all debloated packages to original state |
+| `diag` | Diagnose systemless overlay and metamodule status |
+| `backup` / `delbackup` | Copy removal backups to `/sdcard` / delete an archive |
 
-Action commands print one `STATUS|package|message` line per package.
+---
 
-## Troubleshooting
+## Community & Updates
 
-| Problem | What to check |
-|---|---|
-| No WebUI button | Your manager must support module WebUIs. Update it, or use a WebUI host app. |
-| Header says demo mode | The page is not running inside a root manager. Open it from the module's WebUI button. |
-| List loads slowly | Keep **App sizes** off in **menu, Settings**. It is the slow part. |
-| Icons are blank | Your manager does not serve `ksu://icon/…` (it needs the `listPackages` API), or the app is uninstalled. This is cosmetic. |
-| Sizes show as unknown | The `info` command could not read the package folders. Check root access. |
-| Running shows as unknown | `ps` could not be read in the manager's shell. Everything else still works. |
-| Systemless removal does nothing | Reboot first. If the app is still there, its layout is unsupported, so use Uninstall. |
-| An app came back after an OTA | Disabled and uninstalled apps are re-applied about 15 seconds after boot. If one is still back, run `su -c "sh /data/adb/modules/dbloater/bin/dbl.sh reapply"`. |
-| Export or import fails | `/sdcard/D-bloater/` must be writable by root and `base64` must exist in the manager's shell. |
+- **Telegram**: Join [KernelSU / SukiSU](https://t.me/kokernel) for discussions, feedback, and support.
+- **Releases**: Check [GitHub Releases](../../releases) or use the **Check now** button on the Home tab.
+- **Changelog**: See [CHANGELOG.md](CHANGELOG.md).
 
-## Project layout
-
-```
-D-bloater/
-├── module.prop          module metadata
-├── customize.sh         installer
-├── post-fs-data.sh      bootloop guard
-├── service.sh           re-applies saved states after boot
-├── bin/dbl.sh           backend (all package operations)
-├── webroot/
-│   ├── index.html       the WebUI
-│   └── db.js            bundled package list
-├── .github/workflows/   release workflow
-└── docs/screenshots/    README images (not shipped in the zip)
-```
-
-### Building the zip
-
-```sh
-zip -r D-bloater-v1.3.0.zip . -x "docs/*" ".git/*" ".github/*"
-```
-
-### Releasing
-
-A GitHub Action (`.github/workflows/release.yml`) builds and publishes a release for you:
-
-1. Bump `version` (for example `v1.4.0`) and `versionCode` in `module.prop`.
-2. Push to `main` or `master` with `[release]` anywhere in a commit **title**, for example `Add icons [release]`. A marker only in the commit body does nothing.
-3. The workflow checks the scripts and `module.prop`, builds `D-bloater-vX.Y.Z.zip` with a SHA-256 file, writes notes from the commit titles since the last tag and creates the release. A version with a suffix such as `v1.4.0-beta1` is published as a pre-release.
-
-It stops with a clear error if the tag already exists, `versionCode` did not increase, or a script has a syntax error. To retry, use **Actions, Release, Run workflow**. GitHub lists at most 20 commits per push, so keep `[release]` in one of the newest.
-
-## Changelog
-
-- **v1.4.1**: When a systemless removal fails, or did not apply after the reboot, offer Disable, Uninstall or Cancel removal on the result screen, the banner (Fix…) and the details card. Soft reboot is refused without NoMount rules.
-- **v1.3.0**: App icons. Settings for sizes (off by default), running status and icons. Release workflow.
-- **v1.2.0**: APK size, on-disk size and running status in cards and details. 13 sort options. Selection total in the bottom bar.
-- **v1.1.1**: Critical is limited to the explicit protected list. Critical packages can be disabled with a strong warning and a tick-box.
-- **v1.1.0**: Export and import lists. Package list provider manager (add, delete, enable, update) with UAD-NG format support.
-- **v1.0.0**: First release. WebUI, risk ratings, filters, disable, uninstall and systemless removal, bootloop guard.
-
-## Credits
-
-Ideas and list formats from these projects. No code was copied from them.
-
-- [sunilpaulmathew/De-Bloater](https://github.com/sunilpaulmathew/De-Bloater): the systemless removal approach.
-- [ImKKingshuk/BloatwareHatao](https://github.com/ImKKingshuk/BloatwareHatao): the safety rating scale and the restore-first mindset.
-- [MuntashirAkon/android-debloat-list](https://github.com/MuntashirAkon/android-debloat-list): the list schema and the default online provider.
-- [0x192/universal-android-debloater](https://github.com/0x192/universal-android-debloater): list categories and the UAD list format.
+---
 
 ## Disclaimer
 
-Use at your own risk. The author is not responsible for bootloops, data loss or a device that stops working. Back up first.
+Use at your own risk. The author is not responsible for data loss or device bootloops. Always back up your device before debloating system components.
