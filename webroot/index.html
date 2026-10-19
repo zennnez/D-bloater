@@ -32,6 +32,30 @@ small,.mut{color:var(--mut)}
 .chip.on{background:var(--acc);border-color:var(--acc);color:var(--onacc);font-weight:600}
 .sel3{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 #fSort{grid-column:1/-1}
+.dg{width:100%;height:auto;display:block;margin:8px 0 4px}
+.gn rect{fill:var(--card2);stroke:var(--line);stroke-width:1}
+.gn.en rect{stroke:var(--acc)}
+.gn.na rect{stroke-dasharray:3 3}
+.gn.me rect{fill:var(--acc);stroke:var(--acc)}
+.gn text{fill:var(--fg);font-size:11.5px}
+.gn.off text,.gn.na text{fill:var(--mut)}
+.gn.me text{fill:var(--onacc);font-weight:600}
+.gn[data-id]{cursor:pointer}
+.dg path{fill:none;stroke:var(--mut);stroke-width:1.2}
+.dg .mre{fill:var(--mut);font-size:11px}
+.ic{flex:none;position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;overflow:hidden;background:hsl(var(--h,210) 30% 24%)}
+.ic b{font-size:19px;font-weight:600;line-height:1;color:hsl(var(--h,210) 65% 78%)}
+.ic img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain}
+.ic.big{width:52px;height:52px;border-radius:13px}
+.ic.big b{font-size:25px}
+@media (prefers-color-scheme:light){.ic{background:hsl(var(--h,210) 55% 90%)}.ic b{color:hsl(var(--h,210) 55% 30%)}}
+.dh{display:flex;gap:12px;align-items:center}
+.dh>div{min-width:0}
+.set{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.set:last-of-type{border-bottom:0}
+.set input{width:22px;height:22px;accent-color:var(--acc);flex:none;margin-top:2px}
+.set b{display:block}
+.set span{font-size:13px;color:var(--mut)}
 .b.run{color:var(--acc);border-color:var(--acc)}
 .runc{color:var(--acc);font-weight:600}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0;font-size:14px}
@@ -57,7 +81,7 @@ main{padding:10px 14px}
 .r-critical{color:#fff;background:var(--critical);border-color:var(--critical)}
 .r-unknown{color:var(--unknown)}
 .s-disabled{color:var(--caution)}
-.s-removed,.s-sysrm,.s-sysrm-pending{color:var(--unsafe)}
+.s-removed,.s-sysrm,.s-sysrm-pending,.s-sysrm-failed{color:var(--unsafe)}
 .empty{text-align:center;color:var(--mut);padding:40px 10px}
 .more{display:block;width:100%;margin:6px 0;padding:10px;border-radius:10px;background:var(--card);border:1px solid var(--line)}
 #bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -99,7 +123,7 @@ textarea.inp{resize:vertical}
 
 <header>
   <div class="top">
-    <div><h1>D-bloater</h1><small>by zennnez · <span id="mode">…</span></small></div>
+    <div><h1>D-bloater</h1><small>by zennnez · <span id="mode">…</span><span id="lstat"></span></small></div>
     <button class="icon" id="menuBtn" aria-label="Menu">⋮</button>
   </div>
   <div class="stats" id="stats"></div>
@@ -127,10 +151,13 @@ textarea.inp{resize:vertical}
   <button data-m="update">Package list providers…</button>
   <button data-m="export">Export list…</button>
   <button data-m="import">Import list…</button>
+  <button data-m="settings">Settings…</button>
   <button data-m="selsafe">Select all safe (visible)</button>
   <button data-m="selnone">Clear selection</button>
   <button data-m="crit" id="mCrit">Show critical packages</button>
   <button data-m="log">View action log</button>
+  <button data-m="diag">Diagnose systemless…</button>
+  <button data-m="backup">Copy removal backups to /sdcard</button>
   <button data-m="restoreall">Restore everything</button>
   <button data-m="reboot">Reboot</button>
 </div>
@@ -156,7 +183,7 @@ const PROT = /^(android|com\.android\.(systemui|phone|settings|bluetooth|shell|p
 
 const RISK_TXT = {safe:'Safe', replace:'Replace', caution:'Caution', unsafe:'Unsafe', critical:'Critical', unknown:'Unknown'};
 const RISK_ORDER = {safe:0, replace:1, caution:2, unknown:3, unsafe:4, critical:5};
-const STATE_TXT = {enabled:'Enabled', disabled:'Disabled', removed:'Uninstalled', 'sysrm-pending':'Removal pending reboot', sysrm:'Systemless removed'};
+const STATE_TXT = {enabled:'Enabled', disabled:'Disabled', removed:'Uninstalled', 'sysrm-pending':'Removal pending reboot', 'sysrm-failed':'Not applied after reboot', sysrm:'Systemless removed'};
 const LIST_TXT = {google:'Google', aosp:'AOSP', oem:'OEM', carrier:'Carrier', misc:'Misc', unlisted:'Unlisted'};
 const REMOVAL_RANK = {delete:0, replace:1, caution:2, unsafe:3};
 
@@ -165,6 +192,9 @@ const S = {
   sel: new Set(),
   q: '', risk: 'all', state: 'all', list: 'all', sort: 'name',
   showCritical: false, shown: PAGE,
+  opt: {size: false, running: true, icons: true, used: false, backup: false, autoupd: true},
+  graph: null, graphP: null, edges: {dep: new Map(), req: new Map()}, autoTried: false,
+  usage: new Map(),
   info: new Map(), procs: null, owners: new Set(), infoBusy: false, infoAgain: false, detailId: ''
 };
 
@@ -178,6 +208,36 @@ const numCmp = (f, dir) => (a, b) => {
   if (y == null) return -1;
   return (dir * (x - y)) || nameCmp(a, b);
 };
+function syncSort() {
+  const keys = Object.keys(SORTS).filter(k => !SORT_NEEDS[k] || S.opt[SORT_NEEDS[k]]);
+  if (keys.indexOf(S.sort) < 0) S.sort = 'name';
+  fillSelect('#fSort', keys.map(k => [k, 'Sort: ' + SORTS[k][0]]), S.sort);
+}
+function openSettings() {
+  const row = (k, t, d) => '<label class="set"><input type="checkbox" data-o="' + k + '"' + (S.opt[k] ? ' checked' : '') + '><div><b>' + t + '</b><span>' + d + '</span></div></label>';
+  sheet('<h2>Settings</h2><p class="mut">Turn on only what you need to make the list load faster. Saved on this device.</p>' +
+    row('size', 'App sizes', 'APK and on-disk size. Off by default: this is the slowest part, because every app folder is measured.') +
+    row('running', 'Running status', 'Checks live processes. Quick, but needs one extra command.') +
+    row('used', 'Last used', 'When each app was last opened, from Android usage stats. Adds a sort option. Off by default: it reads a large system dump.') +
+    row('autoupd', 'Update lists automatically', 'Refreshes the package lists in the background when this page opens, if they are over 6 hours old. Skipped on data saver.') +
+    row('backup', 'Backups', 'Save a copy of the app folder before each systemless removal, so it can be reinstalled later. Uses storage: some apps are hundreds of MB. Off by default.') +
+    row('icons', 'App icons', 'Shows each app\'s icon, or its first letter when it has none. Loaded as you scroll.') +
+    '<div class="row"><button class="btn pri" id="sClose">Done</button></div>');
+  document.querySelectorAll('#sheet [data-o]').forEach(c => c.onchange = () => {
+    S.opt[c.dataset.o] = c.checked; saveOpts();
+    applyInfo(); syncSort();
+    if (c.checked && (c.dataset.o === 'size' || c.dataset.o === 'running' || c.dataset.o === 'used')) loadInfo();
+    render();
+  });
+  $('#sClose').onclick = closeSheet;
+}
+function loadOpts() {
+  try { const o = JSON.parse(localStorage.getItem('dbl.opts') || '{}'); ['size', 'running', 'icons', 'used', 'backup', 'autoupd'].forEach(k => { if (typeof o[k] === 'boolean') S.opt[k] = o[k]; }); } catch (e) { /* defaults */ }
+}
+function saveOpts() { try { localStorage.setItem('dbl.opts', JSON.stringify(S.opt)); } catch (e) { /* not persisted */ } }
+loadOpts();
+const SORT_NEEDS = {'used-r': 'used', 'used-o': 'used', 'size-d': 'size', 'size-a': 'size', 'disk-d': 'size', 'run': 'running', 'run-n': 'running'};
+
 const SORTS = {
   'name':   ['Name A–Z', nameCmp],
   'name-d': ['Name Z–A', (a, b) => nameCmp(b, a)],
@@ -190,6 +250,8 @@ const SORTS = {
   'risk-d': ['Risk, riskiest first', numCmp(p => RISK_ORDER[p.risk], -1)],
   'state':  ['State', (a, b) => a.state.localeCompare(b.state) || nameCmp(a, b)],
   'list':   ['List / source', (a, b) => a.list.localeCompare(b.list) || nameCmp(a, b)],
+  'used-r': ['Last used, most recent first', numCmp(p => p.used, -1)],
+  'used-o': ['Last used, longest ago first', (a, b) => (a.used == null) - (b.used == null) === 0 ? ((a.used || 0) - (b.used || 0)) || nameCmp(a, b) : (a.used == null ? -1 : 1)],
   'known':  ['Listed packages first', numCmp(p => p.db ? 0 : 1, 1)],
   'pkg':    ['Package name', (a, b) => a.id.localeCompare(b.id)]
 };
@@ -237,8 +299,8 @@ function mockExec(cmd) {
     mock.state.forEach((st, id) => { if (st !== 'removed') o += 'package:' + id + '\n'; });
     o += '##DIS\n';
     mock.state.forEach((st, id) => { if (st === 'disabled') o += 'package:' + id + '\n'; });
-    o += '##SYSRM\n';
-    mock.sys.forEach(id => { o += id + ' /system/app/' + id.split('.').pop() + '\n'; });
+    o += '##BOOT\nmock-boot\n##SYSRM\n';
+    mock.sys.forEach(id => { o += id + ' /system/app/' + id.split('.').pop() + ' mock-boot\n'; });
     return ok(o + '##END\n');
   }
   if (c === 'info' || c === 'running') {
@@ -251,6 +313,12 @@ function mockExec(cmd) {
     return ok(o + '##RUN\nNAME\nsystem_server\nzygote64\n' + run + '##END\n');
   }
   if (c === 'log') return ok(mock.log.join('\n') || '(empty)');
+  if (c === 'diag') return ok('(demo mode: no device to diagnose)');
+  if (c === 'graph') return ok('##UID\npackage:com.google.android.apps.docs uid:10201\npackage:com.google.android.apps.docs.editors.docs uid:10201\npackage:com.google.android.youtube uid:10305\n##ROLE\nSMS com.google.android.apps.messaging\nDIALER com.google.android.dialer\n##SET\ndefault_input_method=com.google.android.inputmethod.latin/.LatinIME\nenabled_accessibility_services=com.google.android.marvin.talkback/.TalkBackService\n##OVL\ncom.google.android.youtube\n[x] com.google.android.youtube.overlay.demo\n##END\n');
+  if (c === 'backup') return ok('OK|backup|3 archive(s) copied (demo)\n');
+  if (c === 'softreboot') return ok('');
+  if (c === 'usage') { let o = '##USAGE\n', i = 0; mock.state.forEach((_, id) => { i++; if (i % 3) o += 'package=' + id + ' lastTimeUsed="' + new Date(Date.now() - i * 5 * 864e5).toISOString().slice(0, 19).replace('T', ' ') + '"\n'; }); return ok(o + '##END\n'); }
+  if (c === 'plan') return ok(args.map(p => PROT.test(p) ? 'ERR|' + p + '|critical system package: only disable is allowed' : 'PLAN|' + p + '|/system/app/' + p.split('.').pop() + '|NoMount whiteout rule at boot, plus module overlay').join('\n') + '\n');
   if (c === 'files') return ok([...mock.files.keys()].join('\n') + '\n');
   if (c === 'readfile') return mock.files.has(args[0]) ? ok(mock.files.get(args[0])) : {errno: 1, stdout: '', stderr: 'not found'};
   if (c === 'writefile') {
@@ -328,6 +396,27 @@ function buildDb() {
     getRows(p.id).forEach(t => mergeEntry(map, {id: t[0], label: t[1], list: t[2], removal: t[3], desc: t[4], warn: t[5], deps: t[6] || [], reqBy: t[7] || [], src: [p.name]}));
   });
   S.db = map;
+  buildEdges();
+}
+const AUTO_UPD_MS = 6 * 3600 * 1000;
+let autoRun = false;
+function setListStatus(t) { const el = $('#lstat'); if (el) el.textContent = t ? ' · ' + t : ''; }
+// Runs once when the page opens: refresh enabled providers whose copy is older than 6 hours, without blocking the UI
+async function autoUpdateLists() {
+  if (!S.opt.autoupd || autoRun) return;
+  if (navigator.onLine === false || (navigator.connection && navigator.connection.saveData)) return;
+  const due = S.providers.filter(p => p.enabled && Date.now() - (p.updated || 0) > AUTO_UPD_MS);
+  if (!due.length) return;
+  autoRun = true; setListStatus('updating lists…');
+  let ok = 0, added = 0, changed = false;
+  try {
+    for (const p of due) { if (await updateProvider(p)) { ok++; added += p.added || 0; if (p.changed) changed = true; } }
+  } catch (e) { /* the error stays on the provider card */ }
+  autoRun = false; setListStatus('');
+  if (ok && changed) {
+    refreshAfterDb();
+    toast(added ? 'Package lists updated: ' + added + ' new ' + (added === 1 ? 'entry' : 'entries') + '.' : 'Package lists updated.');
+  }
 }
 function refreshAfterDb() { buildDb(); decorate(); render(); }
 
@@ -387,6 +476,9 @@ async function updateProvider(p) {
     saveProviders();
     return false;
   }
+  const old = getRows(p.id), oldIds = new Set(old.map(t => t[0]));
+  p.added = r.rows.filter(t => !oldIds.has(t[0])).length;
+  p.changed = p.added > 0 || JSON.stringify(old) !== JSON.stringify(r.rows);
   S.mem[p.id] = r.rows;
   let cached = true;
   try { localStorage.setItem('dbl.pc.' + p.id, JSON.stringify(r.rows)); } catch (e) { cached = false; }
@@ -589,7 +681,7 @@ function importSummary(map, name) {
 
 /* ------------------------------------------------------------------ scan */
 function parseScan(out) {
-  const sec = {ALL: [], INST: [], DIS: [], SYSRM: []};
+  const sec = {ALL: [], INST: [], DIS: [], SYSRM: [], BOOT: []};
   let cur = null;
   out.split('\n').forEach(raw => {
     const l = raw.trim();
@@ -601,7 +693,8 @@ function parseScan(out) {
   const inst = new Set(), dis = new Set(), sysrm = new Map();
   sec.INST.forEach(l => { const m = l.match(/^package:([\w.]+)$/); if (m) inst.add(m[1]); });
   sec.DIS.forEach(l => { const m = l.match(/^package:([\w.]+)$/); if (m) dis.add(m[1]); });
-  sec.SYSRM.forEach(l => { const i = l.indexOf(' '); if (i > 0) sysrm.set(l.slice(0, i), l.slice(i + 1)); });
+  const boot = (sec.BOOT[0] || '').trim();
+  sec.SYSRM.forEach(l => { const i = l.indexOf(' '); if (i > 0) { const r = l.slice(i + 1).split(' '); sysrm.set(l.slice(0, i), {dir: r[0], bid: r[1] || ''}); } });
   const list = [];
   const seen = new Set();
   sec.ALL.forEach(l => {
@@ -610,10 +703,12 @@ function parseScan(out) {
     seen.add(m[2]);
     const id = m[2], path = m[1];
     let state = dis.has(id) ? 'disabled' : (inst.has(id) ? 'enabled' : 'removed');
-    if (sysrm.has(id)) state = 'sysrm-pending';
+    const r = sysrm.get(id);
+    // Still listed after the reboot that followed the request: the overlay did not take effect
+    if (r) state = r.bid && boot && r.bid !== boot ? 'sysrm-failed' : 'sysrm-pending';
     list.push({id, path, state});
   });
-  sysrm.forEach((dir, id) => { if (!seen.has(id)) list.push({id, path: dir, state: 'sysrm'}); });
+  sysrm.forEach((r, id) => { if (!seen.has(id)) list.push({id, path: r.dir, state: 'sysrm'}); });
   return list;
 }
 function guessLabel(id) {
@@ -650,6 +745,22 @@ function sections(out) {
   });
   return sec;
 }
+// Lines from `dumpsys usagestats`: package=<id> ... lastTimeUsed="2026-10-12 10:22:01" (or epoch ms)
+function parseUsage(out) {
+  const m = new Map();
+  (out || '').split('\n').forEach(l => {
+    const a = l.match(/package=([\w.]+)/), b = l.match(/lastTimeUsed="?(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d|\d{10,})/);
+    if (!a || !b) return;
+    const t = /^\d+$/.test(b[1]) ? Number(b[1]) : new Date(b[1].replace(' ', 'T')).getTime();
+    if (!(t > 9.46e11)) return; // before year 2000 means "never"
+    if (!m.has(a[1]) || m.get(a[1]) < t) m.set(a[1], t);
+  });
+  return m;
+}
+function agoText(t) {
+  const d = Math.floor((Date.now() - t) / 864e5);
+  return d < 1 ? 'today' : d === 1 ? 'yesterday' : d < 60 ? d + ' days ago' : Math.floor(d / 30) + ' months ago';
+}
 function parseProcs(lines) {
   if (!lines) return null;
   const s = new Set();
@@ -679,21 +790,31 @@ function applyInfo() {
   S.owners = new Set();
   if (S.procs) S.procs.forEach(n => { const o = ownerOf(n); if (o) S.owners.add(o); });
   S.pkgs.forEach(p => {
-    const i = S.info.get(p.id);
+    const i = S.opt.size ? S.info.get(p.id) : null;
     p.apk = i && i[0] > 0 ? i[0] : null;
     p.disk = i && i[1] > 0 ? i[1] * 1024 : null;
-    p.running = S.procs ? ((p.state === 'enabled' || p.state === 'sysrm-pending') && S.owners.has(p.id)) : null;
+    p.used = S.opt.used && S.usage.has(p.id) ? S.usage.get(p.id) : null;
+    p.running = S.opt.running && S.procs ? ((p.state === 'enabled' || p.state === 'sysrm-pending' || p.state === 'sysrm-failed') && S.owners.has(p.id)) : null;
   });
 }
 async function loadInfo() {
   if (S.infoBusy) { S.infoAgain = true; return; }
+  const want = (S.opt.size ? ' size' : '') + (S.opt.running ? ' running' : '');
+  if (!want && !S.opt.used) { applyInfo(); return; } // everything turned off: nothing to run
   S.infoBusy = true;
   try {
-    const r = await exec(BIN + ' info');
-    if (r.errno === 0 || r.stdout) {
-      const x = parseInfo(r.stdout);
-      if (x.info.size) S.info = x.info;
-      if (x.procs) S.procs = x.procs;
+    if (want) {
+      const r = await exec(BIN + ' info' + want);
+      if (r.errno === 0 || r.stdout) {
+        const x = parseInfo(r.stdout);
+        if (S.opt.size && x.info.size) S.info = x.info;
+        if (S.opt.running && x.procs) S.procs = x.procs;
+        applyInfo(); renderList(); renderBar();
+      }
+    }
+    if (S.opt.used) {
+      const u = await exec(BIN + ' usage');
+      S.usage = parseUsage(u.stdout);
       applyInfo(); renderList(); renderBar();
     }
   } catch (e) { /* sizes stay unknown */ }
@@ -701,6 +822,7 @@ async function loadInfo() {
   if (S.infoAgain) { S.infoAgain = false; loadInfo(); }
 }
 async function refreshRunning() {
+  if (!S.opt.running) return;
   try {
     const r = await exec(BIN + ' running');
     const procs = parseProcs(sections(r.stdout).RUN);
@@ -710,6 +832,7 @@ async function refreshRunning() {
 function runHtml(p) {
   if (p.state === 'disabled') return 'Not running (disabled)';
   if (p.state === 'removed') return 'Not running (uninstalled)';
+  if (p.state === 'sysrm-failed') return p.running ? '<span class="runc">● Running</span>' : 'Not running';
   if (p.state === 'sysrm' || p.state === 'sysrm-pending') return p.running ? '<span class="runc">● Running</span> (until reboot)' : 'Not running';
   if (p.running === null) return '<span class="mut">unknown</span>';
   return p.running ? '<span class="runc">● Running</span>' : 'Not running';
@@ -727,6 +850,8 @@ async function scan() {
   } finally { busy(null); }
   render();
   loadInfo();
+  S.graphP = null; ensureGraph();
+  if (!S.autoTried) { S.autoTried = true; setTimeout(autoUpdateLists, 2500); }
 }
 
 /* ------------------------------------------------------------------ rendering */
@@ -736,7 +861,7 @@ function visible() {
     if (p.risk === 'critical' && !S.showCritical && S.risk !== 'critical') return false;
     if (S.risk !== 'all' && p.risk !== S.risk) return false;
     if (S.state !== 'all') {
-      if (S.state === 'sysrm') { if (p.state !== 'sysrm' && p.state !== 'sysrm-pending') return false; }
+      if (S.state === 'sysrm') { if (p.state.indexOf('sysrm') !== 0) return false; }
       else if (p.state !== S.state) return false;
     }
     if (S.list !== 'all' && p.list !== S.list) return false;
@@ -756,12 +881,92 @@ function renderStats() {
   });
   $('#stats').innerHTML = '<span><b>' + S.pkgs.length + '</b> total</span><span><b>' + c.enabled + '</b> enabled</span><span><b>' + c.safe + '</b> safe to remove</span><span><b>' + c.disabled + '</b> disabled</span><span><b>' + c.removed + '</b> uninstalled</span><span><b>' + c.sys + '</b> systemless</span>';
   const pend = S.pkgs.filter(p => p.state === 'sysrm-pending').length;
+  const fail = S.pkgs.filter(p => p.state === 'sysrm-failed').length;
   const b = $('#banner');
   if (pend) {
     b.hidden = false;
-    b.innerHTML = '<span>' + pend + ' systemless change' + (pend > 1 ? 's' : '') + ' pending, reboot to apply.</span><button class="btn" id="bannerReboot">Reboot</button>';
+    b.innerHTML = '<span>' + pend + ' systemless change' + (pend > 1 ? 's' : '') + ' pending, reboot to apply.</span><span><button class="btn" id="bannerSoft">Soft reboot</button> <button class="btn" id="bannerReboot">Reboot</button></span>';
     $('#bannerReboot').onclick = doReboot;
+    $('#bannerSoft').onclick = doSoftReboot;
+  } else if (fail) {
+    b.hidden = false;
+    b.innerHTML = '<span>' + fail + ' systemless removal' + (fail > 1 ? 's' : '') + ' not applied after reboot.</span><span><button class="btn" id="bannerFix">Fix…</button> <button class="btn" id="bannerDiag">Diagnose</button></span>';
+    $('#bannerDiag').onclick = showDiag;
+    $('#bannerFix').onclick = openFailed;
   } else b.hidden = true;
+}
+// Every card gets a letter avatar. The manager's icon (<img src="ksu://icon/<package>">) is laid over it
+// only when it is a real icon. Apps without one all get the same generic four-square picture from the
+// manager, so that picture is recognised by its pixels and dropped, leaving the letter. Each icon is
+// requested only when its card nears the screen, so a long list does not start hundreds of loads at once.
+const iconObs = typeof IntersectionObserver === 'function' ? new IntersectionObserver((es, o) => {
+  es.forEach(e => { if (e.isIntersecting) { o.unobserve(e.target); setIcon(e.target); } });
+}, {rootMargin: '300px'}) : null;
+function pixelsOf(img) {
+  try {
+    const c = document.createElement('canvas');
+    c.width = c.height = 12;
+    const x = c.getContext('2d', {willReadFrequently: true});
+    x.drawImage(img, 0, 0, 12, 12);
+    const d = x.getImageData(0, 0, 12, 12).data;
+    let h = 5381;
+    for (let i = 0; i < d.length; i++) h = ((h * 33) ^ (d[i] >> 3)) >>> 0;
+    return String(h);
+  } catch (e) { return null; } // canvas tainted (manager sends no CORS header): cannot tell
+}
+let probe = null;
+function placeholderPx() {
+  if (!probe) probe = new Promise(res => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => res(pixelsOf(im));
+    im.onerror = () => res(null);
+    im.src = 'ksu://icon/dbloater.placeholder.probe';
+  });
+  return probe;
+}
+const iconSeen = new Map(), iconBad = new Set();
+async function setIcon(el) {
+  const pkg = el.dataset.ic;
+  const img = new Image();
+  img.alt = ''; img.decoding = 'async';
+  let plain = false;
+  img.crossOrigin = 'anonymous';
+  img.onerror = () => {
+    if (plain) return;                 // no icon at all: the letter stays
+    plain = true; img.crossOrigin = null; img.src = 'ksu://icon/' + pkg; // older manager: show it unchecked
+  };
+  img.onload = async () => {
+    if (plain) { el.appendChild(img); return; }
+    const px = pixelsOf(img);
+    if (px === null) { el.appendChild(img); return; }
+    const ref = await placeholderPx();
+    if (ref !== null) { if (px !== ref) el.appendChild(img); return; }
+    // The manager has no placeholder to compare with: the same picture on 4+ different apps is the placeholder
+    if (iconBad.has(px)) return;
+    const set = iconSeen.get(px) || new Set();
+    set.add(pkg); iconSeen.set(px, set);
+    img.dataset.px = px;
+    el.appendChild(img);
+    if (set.size >= 4) {
+      iconBad.add(px);
+      document.querySelectorAll('.ic img[data-px="' + px + '"]').forEach(i => i.remove());
+    }
+  };
+  img.src = 'ksu://icon/' + pkg;
+}
+function letterOf(p) {
+  const m = String(p.label || '').match(/[A-Za-z0-9]/) || p.id.replace(/^(com|org|net|io)\./, '').match(/[A-Za-z0-9]/);
+  return (m ? m[0] : '?').toUpperCase();
+}
+function iconHtml(p, big) {
+  if (!S.opt.icons) return '';
+  let h = 0;
+  for (let i = 0; i < p.id.length; i++) h = (h * 31 + p.id.charCodeAt(i)) >>> 0;
+  return '<span class="ic' + (big ? ' big' : '') + '"' + (HAS_KSU ? ' data-ic="' + esc(p.id) + '"' : '') + ' style="--h:' + (h % 360) + '"><b>' + esc(letterOf(p)) + '</b></span>';
+}
+function loadIcons(root) {
+  root.querySelectorAll('.ic[data-ic]').forEach(el => { if (iconObs) iconObs.observe(el); else setIcon(el); });
 }
 function renderList() {
   const arr = visible();
@@ -771,17 +976,19 @@ function renderList() {
   arr.slice(0, S.shown).forEach(p => {
     const d = document.createElement('div');
     d.className = 'card' + (p.protected ? ' lock' : '');
-    d.innerHTML = '<label class="ck"><input type="checkbox"' + (S.sel.has(p.id) ? ' checked' : '') + '></label>' +
+    d.innerHTML = '<label class="ck"><input type="checkbox"' + (S.sel.has(p.id) ? ' checked' : '') + '></label>' + iconHtml(p) +
       '<div class="meta"><div class="name">' + esc(p.label) + '</div><div class="pkg">' + esc(p.id) + '</div><div class="tags">' +
       '<span class="b r-' + p.risk + '">' + RISK_TXT[p.risk] + '</span>' +
       '<span class="b s-' + p.state + '">' + STATE_TXT[p.state] + '</span>' +
       '<span class="b">' + LIST_TXT[p.list] + '</span>' + (p.priv ? '<span class="b">priv-app</span>' : '') +
-      (p.apk != null ? '<span class="b">' + fmtBytes(p.apk) + '</span>' : '') +
-      (p.running ? '<span class="b run">● Running</span>' : '') + '</div></div>';
+      (S.opt.size && p.apk != null ? '<span class="b">' + fmtBytes(p.apk) + '</span>' : '') +
+      (S.opt.running && p.running ? '<span class="b run">● Running</span>' : '') +
+      (S.opt.used ? '<span class="b">' + (p.used ? 'Used ' + agoText(p.used) : 'No usage data') + '</span>' : '') + '</div></div>';
     d.querySelector('input').onchange = e => { if (e.target.checked) S.sel.add(p.id); else S.sel.delete(p.id); renderBar(); };
     d.querySelector('.meta').onclick = () => openDetail(p.id);
     root.appendChild(d);
   });
+  loadIcons(root);
   if (arr.length > S.shown) {
     const m = document.createElement('button');
     m.className = 'more';
@@ -795,7 +1002,7 @@ function renderBar() {
   const n = S.sel.size;
   $('#bar').hidden = n === 0;
   let tot = 0, known = 0;
-  S.sel.forEach(id => { const p = S.byId.get(id); if (p && p.apk != null) { tot += p.apk; known++; } });
+  S.sel.forEach(id => { const p = S.byId.get(id); if (S.opt.size && p && p.apk != null) { tot += p.apk; known++; } });
   $('#cnt').textContent = n + ' selected' + (known ? ' · ' + fmtBytes(tot) : '');
 }
 function renderChips() {
@@ -829,42 +1036,173 @@ function confirmDlg(o) {
   });
 }
 
+/* ------------------------------------------------------------------ dependency graph */
+// Edges come from the package lists (made two-way: if A lists B as a dependency, B is "needed by" A even
+// when B's own entry says nothing) plus facts read from the device: shared user IDs, default-app roles,
+// settings that name an app as keyboard / accessibility service / assistant, and overlays.
+const ROLE_TXT = {HOME: 'Home screen (launcher)', DIALER: 'Phone app', SMS: 'SMS app', BROWSER: 'Default browser', ASSISTANT: 'Assistant', EMERGENCY: 'Emergency info', CALL_REDIRECTION: 'Call redirection', CALL_SCREENING: 'Call screening', NOTES: 'Notes', SYSTEM_GALLERY: 'Gallery', SYSTEM_WELLBEING: 'Digital wellbeing'};
+const SET_TXT = {default_input_method: 'Keyboard in use', enabled_input_methods: 'Keyboard enabled', enabled_accessibility_services: 'Accessibility service on', enabled_notification_listeners: 'Has notification access', assistant: 'Assistant', voice_interaction_service: 'Voice assistant', voice_recognition_service: 'Voice input', autofill_service: 'Autofill'};
+const STRONG_USE = new Set(['HOME', 'DIALER', 'SMS', 'default_input_method']);
+function buildEdges() {
+  const dep = new Map(), req = new Map();
+  const add = (m, k, v) => { if (k === v) return; let x = m.get(k); if (!x) m.set(k, x = new Set()); x.add(v); };
+  S.db.forEach(e => {
+    (e.deps || []).forEach(d => { add(dep, e.id, d); add(req, d, e.id); });
+    (e.reqBy || []).forEach(r => { add(req, e.id, r); add(dep, r, e.id); });
+  });
+  S.edges = {dep, req};
+}
+function parseGraph(out) {
+  const sec = {UID: [], ROLE: [], SET: [], OVL: []};
+  let cur = null;
+  (out || '').split('\n').forEach(l => {
+    l = l.replace(/\r$/, '');
+    const m = l.match(/^##(\w+)/);
+    if (m) { cur = sec[m[1]] || null; return; }
+    if (cur && l.trim()) cur.push(l);
+  });
+  const uid = new Map(), groups = new Map(), use = new Map(), tgt = new Map(), ovl = new Map();
+  const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
+  sec.UID.forEach(l => { const m = l.match(/^package:(\S+)\s+uid:(\d+)/); if (m) { uid.set(m[1], m[2]); push(groups, m[2], m[1]); } });
+  const mark = (pkg, key, txt) => {
+    const a = use.get(pkg) || [];
+    if (!a.some(u => u.key === key)) push(use, pkg, {key, txt, strong: STRONG_USE.has(key)});
+  };
+  sec.ROLE.forEach(l => { const f = l.split(' '); if (ROLE_TXT[f[0]] && f[1]) mark(f[1], f[0], ROLE_TXT[f[0]]); });
+  sec.SET.forEach(l => {
+    const i = l.indexOf('='), k = l.slice(0, i), v = l.slice(i + 1).trim();
+    if (!SET_TXT[k] || !v || v === 'null') return;
+    v.split(':').forEach(c => { const pkg = c.split('/')[0].split(';')[0].trim(); if (/^[\w.]+$/.test(pkg)) mark(pkg, k, SET_TXT[k]); });
+  });
+  let target = '';
+  sec.OVL.forEach(l => {
+    const m = l.match(/^(\[.\]|---)\s+(\S+)/);
+    if (m) { if (target) { tgt.set(m[2], target); push(ovl, target, {pkg: m[2], on: m[1] === '[x]'}); } }
+    else if (/^[\w.]+$/.test(l.trim())) target = l.trim();
+  });
+  return {uid, groups, use, tgt, ovl};
+}
+function ensureGraph(force) {
+  if (S.graphP && !force) return S.graphP;
+  S.graphP = (async () => {
+    try { const r = await exec(BIN + ' graph'); if (r.stdout) S.graph = parseGraph(r.stdout); } catch (e) { /* device facts stay unknown */ }
+  })();
+  return S.graphP;
+}
+const usesOf = id => (S.graph && S.graph.use.get(id)) || [];
+function peersOf(id) {
+  const g = S.graph, u = g && g.uid.get(id);
+  return u ? (g.groups.get(u) || []).filter(x => x !== id) : [];
+}
+// Installed apps that need any of ids, followed through the chain (up to 4 steps): id -> steps away
+function affected(ids) {
+  const start = new Set(ids), seen = new Map();
+  let front = [...start], d = 0;
+  while (front.length && d < 4) {
+    d++;
+    const next = [];
+    front.forEach(x => (S.edges.req.get(x) || []).forEach(y => {
+      const o = S.byId.get(y);
+      if (start.has(y) || seen.has(y) || !o || o.state !== 'enabled') return;
+      seen.set(y, d); next.push(y);
+    }));
+    front = next;
+  }
+  return seen;
+}
+const nodeName = id => { const o = S.byId.get(id); return o ? o.label : id.split('.').slice(-2).join('.'); };
+function graphSvg(p) {
+  const rank = id => { const o = S.byId.get(id); return o ? (o.state === 'enabled' ? 0 : 1) : 2; };
+  const sorted = set => [...(set || [])].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const top = sorted(S.edges.req.get(p.id)), bot = sorted(S.edges.dep.get(p.id));
+  if (!top.length && !bot.length) return '';
+  const MAX = 8, W = 340, NW = 160, NH = 26, GAP = 8, LINK = 24, CH = 32;
+  const tn = top.slice(0, MAX), bn = bot.slice(0, MAX);
+  const rows = n => Math.ceil(n / 2);
+  const node = (id, x, y, w, h, cls) => {
+    const o = S.byId.get(id), st = o ? (o.state === 'enabled' ? 'en' : 'off') : 'na';
+    const name = nodeName(id), t = name.length > 24 ? name.slice(0, 23) + '…' : name;
+    return '<g class="gn ' + (cls || st) + '"' + (o && !cls ? ' data-id="' + esc(id) + '"' : '') + '><title>' + esc(id) + '</title><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="7"/><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 4) + '" text-anchor="middle">' + esc(t) + '</text></g>';
+  };
+  const cx = W / 2;
+  let y = 4, out = '', edges = '';
+  const topY = y;
+  const topEnd = tn.length ? topY + rows(tn.length) * (NH + GAP) - GAP : topY;
+  const cy = tn.length ? topEnd + LINK + (top.length > MAX ? 12 : 0) : y;
+  tn.forEach((id, i) => {
+    const x = i % 2 ? W - NW - 4 : 4, ny = topY + Math.floor(i / 2) * (NH + GAP), tx = cx + (i % 2 ? 28 : -28);
+    out += node(id, x, ny, NW, NH);
+    edges += '<path d="M' + (x + NW / 2) + ' ' + (ny + NH) + ' C' + (x + NW / 2) + ' ' + (ny + NH + 14) + ' ' + tx + ' ' + (cy - 16) + ' ' + tx + ' ' + (cy - 1) + '" marker-end="url(#ar)"/>';
+  });
+  if (top.length > MAX) out += '<text class="mre" x="' + cx + '" y="' + (topEnd + 12) + '" text-anchor="middle">+' + (top.length - MAX) + ' more need this</text>';
+  out += node(p.id, cx - 100, cy, 200, CH, 'me');
+  const by = cy + CH + LINK;
+  bn.forEach((id, i) => {
+    const x = i % 2 ? W - NW - 4 : 4, ny = by + Math.floor(i / 2) * (NH + GAP), sx = cx + (i % 2 ? 28 : -28);
+    out += node(id, x, ny, NW, NH);
+    edges += '<path d="M' + sx + ' ' + (cy + CH) + ' C' + sx + ' ' + (cy + CH + 14) + ' ' + (x + NW / 2) + ' ' + (ny - 16) + ' ' + (x + NW / 2) + ' ' + (ny - 1) + '" marker-end="url(#ar)"/>';
+  });
+  let H = bn.length ? by + rows(bn.length) * (NH + GAP) - GAP : cy + CH;
+  if (bot.length > MAX) { out += '<text class="mre" x="' + cx + '" y="' + (H + 14) + '" text-anchor="middle">+' + (bot.length - MAX) + ' more needed</text>'; H += 18; }
+  return '<svg class="dg" viewBox="0 0 ' + W + ' ' + (H + 4) + '" role="img" aria-label="Dependency graph"><defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" style="fill:var(--mut);stroke:none"/></marker></defs>' + edges + out + '</svg>';
+}
+function graphHtml(p) {
+  const g = S.graph, svg = graphSvg(p), bits = [];
+  const use = usesOf(p.id), peers = peersOf(p.id);
+  if (use.length) bits.push('<div class="box ' + (use.some(u => u.strong) ? 'bad' : 'warn') + '">In use right now: <b>' + esc(use.map(u => u.txt).join(', ')) + '</b></div>');
+  if (peers.length) bits.push('<div class="kv">' + (peers.length > 12 ? 'Shares the system user ID with ' + peers.length + ' packages.' : 'Shares user ID with: ' + esc(peers.map(nodeName).join(', ')) + '. They are one app to Android, so removing one can break the others.') + '</div>');
+  if (g) {
+    const mine = g.ovl.get(p.id), tg = g.tgt.get(p.id);
+    if (mine) bits.push('<div class="kv">' + mine.length + ' overlay' + (mine.length > 1 ? 's restyle' : ' restyles') + ' this app (' + mine.filter(o => o.on).length + ' active).</div>');
+    if (tg) bits.push('<div class="kv">Overlay that restyles ' + esc(nodeName(tg)) + '.</div>');
+  }
+  const aff = affected([p.id]);
+  if (aff.size) bits.push('<div class="kv">Removing it also affects <b>' + aff.size + '</b> installed app' + (aff.size > 1 ? 's' : '') + ' that need it' + ([...aff.values()].some(v => v > 1) ? ' (some indirectly)' : '') + '.</div>');
+  if (!svg && !bits.length) {
+    return '<div class="box"><b>Dependencies</b><div class="mut">' + (g || !S.graphP ? 'None known. The lists only cover some packages, and this one has no default role, shared user ID or overlay on this device.' : 'Reading device facts…') + '</div></div>';
+  }
+  return '<div class="box"><b>Dependencies</b>' + (svg ? '<div class="mut" style="font-size:12px">An arrow means “needs”. Solid outline: installed. Dashed: not on this device.</div>' + svg : '') + bits.join('') + '</div>';
+}
+function bindGraph() {
+  document.querySelectorAll('#dGraph [data-id]').forEach(n => n.onclick = () => openDetail(n.dataset.id));
+}
+
 function badges(p) {
   return '<div class="tags"><span class="b r-' + p.risk + '">' + RISK_TXT[p.risk] + '</span><span class="b s-' + p.state + '">' + STATE_TXT[p.state] + '</span><span class="b">' + LIST_TXT[p.list] + '</span></div>';
-}
-function depList(title, ids) {
-  if (!ids || !ids.length) return '';
-  return '<div class="box"><b>' + title + '</b><ul class="dep">' + ids.map(i => {
-    const p = S.byId.get(i);
-    const tag = p ? (p.state === 'enabled' ? ' <span class="r-caution">(installed)</span>' : ' <span class="mut">(' + STATE_TXT[p.state].toLowerCase() + ')</span>') : ' <span class="mut">(not on device)</span>';
-    return '<li>' + esc(i) + tag + '</li>';
-  }).join('') + '</ul></div>';
 }
 function openDetail(id) {
   const p = S.byId.get(id);
   if (!p) return;
   const d = p.db;
   const acts = [];
-  if (p.state === 'enabled') acts.push(['disable', 'Disable', 'warn']);
+  const queued = p.state === 'sysrm-pending' || p.state === 'sysrm-failed';
+  if (p.state === 'enabled' || queued) acts.push(['disable', 'Disable' + (queued ? ' instead' : ''), 'warn']);
   if (!p.protected) {
-    if (p.state === 'enabled' || p.state === 'disabled') acts.push(['uninstall', 'Uninstall (user 0)', 'bad']);
+    if (p.state === 'enabled' || p.state === 'disabled' || queued) acts.push(['uninstall', 'Uninstall (user 0)' + (queued ? ' instead' : ''), 'bad']);
     if (['enabled', 'disabled', 'removed'].indexOf(p.state) >= 0) acts.push(['sysrm', 'Systemless remove', 'bad']);
   }
-  if (p.state !== 'enabled') acts.push(['restore', 'Restore', 'pri']);
+  if (p.state !== 'enabled') acts.push(['restore', queued ? 'Cancel removal' : 'Restore', 'pri']);
+  if (p.state.indexOf('sysrm') === 0) acts.push(['backuprestore', 'Reinstall from backup', '']);
   S.detailId = id;
-  sheet('<h2>' + esc(p.label) + '</h2><div class="pkg">' + esc(p.id) + '</div>' + badges(p) +
-    '<dl class="facts"><dt>APK size</dt><dd id="dApk">' + (p.apk != null ? fmtBytes(p.apk) : '<span class="mut">unknown</span>') + '</dd>' +
-    '<dt>On disk</dt><dd id="dDisk">' + (p.disk != null ? fmtBytes(p.disk) + ' <span class="mut">(APK, libs, odex)</span>' : '<span class="mut">unknown</span>') + '</dd>' +
-    '<dt>Running</dt><dd id="dRun">' + runHtml(p) + '</dd>' +
+  sheet('<div class="dh">' + iconHtml(p, true) + '<div><h2>' + esc(p.label) + '</h2><div class="pkg">' + esc(p.id) + '</div></div></div>' + badges(p) +
+    '<dl class="facts">' +
+    (S.opt.size ? '<dt>APK size</dt><dd id="dApk">' + (p.apk != null ? fmtBytes(p.apk) : '<span class="mut">unknown</span>') + '</dd>' +
+    '<dt>On disk</dt><dd id="dDisk">' + (p.disk != null ? fmtBytes(p.disk) + ' <span class="mut">(APK, libs, odex)</span>' : '<span class="mut">unknown</span>') + '</dd>' : '') +
+    (S.opt.used ? '<dt>Last used</dt><dd>' + (p.used ? agoText(p.used) + ' <span class="mut">(' + new Date(p.used).toLocaleString() + ')</span>' : '<span class="mut">no data</span>') + '</dd>' : '') +
+    (S.opt.running ? '<dt>Running</dt><dd id="dRun">' + runHtml(p) + '</dd>' : '') +
     '<dt>Path</dt><dd>' + esc(p.path) + '</dd></dl>' +
     '<p>' + esc(d && d.desc ? d.desc : 'No description in the package list. Treat unlisted packages with care and prefer Disable first.') + '</p>' +
     (d && d.warn ? '<div class="box warn">⚠ ' + esc(d.warn) + '</div>' : '') +
+    (p.state === 'sysrm-failed' ? '<div class="box bad">⚠ Systemless removal did not apply after the reboot. Use Disable or Uninstall instead, or run Diagnose systemless from the menu.</div>' : '') +
     (p.protected ? '<div class="box bad">⚠ Critical system component. Disabling it can leave the device without UI, calls, or a working boot. Only Disable is allowed; Uninstall and Systemless remove are blocked. To undo from a PC: <code>adb shell pm enable ' + esc(p.id) + '</code></div>' : '') +
-    depList('Required by', d && d.reqBy) + depList('Depends on', d && d.deps) +
+    '<div id="dGraph" data-for="' + esc(id) + '">' + graphHtml(p) + '</div>' +
     (d && d.src && d.src.length ? '<div class="kv">Listed by: ' + esc(d.src.join(', ')) + '</div>' : '') +
     '<div class="row">' + acts.map(a => '<button class="btn ' + a[2] + '" data-a="' + a[0] + '">' + a[1] + '</button>').join('') + '<button class="btn" id="dClose">Close</button></div>');
+  loadIcons($('#sheet'));
+  bindGraph();
+  ensureGraph().then(() => { const el = $('#dGraph'); if (el && el.dataset.for === id && S.byId.get(id)) { el.innerHTML = graphHtml(S.byId.get(id)); bindGraph(); } });
   $('#dClose').onclick = closeSheet;
-  document.querySelectorAll('#sheet [data-a]').forEach(b => b.onclick = () => { closeSheet(); act(b.dataset.a, [id]); });
+  document.querySelectorAll('#sheet [data-a]').forEach(b => b.onclick = () => { closeSheet(); if (b.dataset.a === 'backuprestore') doBackupRestore(id); else act(b.dataset.a, [id]); });
   // running state changes constantly, so re-check it when the card opens
   if (p.state === 'enabled') refreshRunning().then(() => {
     const el = $('#dRun'), q = S.byId.get(id);
@@ -874,8 +1212,8 @@ function openDetail(id) {
 
 /* ------------------------------------------------------------------ actions */
 const ACTS = {
-  disable:   {label: 'Disable',            ok: s => s === 'enabled',                                 note: 'Disables the app for user 0. Reversible instantly.', cls: 'warn'},
-  uninstall: {label: 'Uninstall (user 0)', ok: s => s === 'enabled' || s === 'disabled',             note: 'Removes the app for the current user. The APK stays on /system, so Restore always works.', cls: 'bad'},
+  disable:   {label: 'Disable',            ok: s => s === 'enabled' || s === 'sysrm-pending' || s === 'sysrm-failed', note: 'Disables the app for user 0. Reversible instantly.', cls: 'warn'},
+  uninstall: {label: 'Uninstall (user 0)', ok: s => s === 'enabled' || s === 'disabled' || s === 'sysrm-pending' || s === 'sysrm-failed', note: 'Removes the app for the current user. The APK stays on /system, so Restore always works.', cls: 'bad'},
   sysrm:     {label: 'Systemless remove',  ok: s => ['enabled', 'disabled', 'removed'].indexOf(s) >= 0, note: 'Hides the app folder using this module. Takes effect after a reboot. Not supported on every partition.', cls: 'bad'},
   restore:   {label: 'Restore',            ok: s => s !== 'enabled',                                 note: 'Re-enables, reinstalls, or un-hides the selected apps.', cls: 'pri'}
 };
@@ -894,25 +1232,43 @@ async function act(kind, ids) {
   const unsafe = targets.filter(p => p.risk === 'unsafe');
   const crit = targets.filter(p => p.risk === 'critical');
   const sel = new Set(targets.map(p => p.id));
-  const depWarn = [];
-  if (kind !== 'restore') {
-    targets.forEach(p => {
-      const need = (p.db && p.db.reqBy || []).filter(i => { const o = S.byId.get(i); return o && o.state === 'enabled' && !sel.has(i); });
-      if (need.length) depWarn.push(p.label + ' is required by ' + need.slice(0, 3).join(', ') + (need.length > 3 ? '…' : ''));
-    });
-  }
+  if (kind !== 'restore') await ensureGraph();
+  const aff = kind === 'restore' ? new Map() : affected([...sel]);
+  const inuse = kind === 'restore' ? [] : targets.filter(p => usesOf(p.id).some(u => u.strong));
+  const peerWarn = kind === 'restore' ? [] : targets.map(p => [p, peersOf(p.id).filter(x => { const o = S.byId.get(x); return o && o.state === 'enabled' && !sel.has(x); })]).filter(x => x[1].length && x[1].length <= 12);
   let body = '<p>' + esc(A.note) + '</p><div class="box"><b>' + targets.length + ' package' + (targets.length > 1 ? 's' : '') + '</b>' +
     (skipped ? ' <span class="mut">(' + skipped + ' skipped: protected or wrong state)</span>' : '') +
     '<ul class="dep">' + targets.slice(0, 8).map(p => '<li>' + esc(p.label) + ' <span class="b r-' + p.risk + '">' + RISK_TXT[p.risk] + '</span></li>').join('') +
     (targets.length > 8 ? '<li class="mut">…and ' + (targets.length - 8) + ' more</li>' : '') + '</ul></div>';
   if (kind !== 'restore' && risky.length) body += '<div class="box warn">⚠ ' + risky.length + ' item' + (risky.length > 1 ? 's are' : ' is') + ' rated Caution, Unsafe or Unknown. Removing them can break features.</div>';
   if (kind !== 'restore' && crit.length) body += '<div class="box bad">⚠ ' + crit.length + ' critical system component' + (crit.length > 1 ? 's' : '') + ' (' + esc(crit.slice(0, 3).map(p => p.label).join(', ')) + (crit.length > 3 ? '…' : '') + '). Disabling can leave the device without UI, calls, or a working boot. Undo from a PC with <code>adb shell pm enable &lt;package&gt;</code>.</div>';
-  if (depWarn.length) body += '<div class="box warn">' + depWarn.slice(0, 4).map(esc).join('<br>') + '</div>';
-  if (kind === 'sysrm') body += '<div class="box">If the device ever fails to boot 3 times, D-bloater disables itself automatically so you can recover.</div>';
+  if (inuse.length) body += '<div class="box bad">⚠ In use right now:<ul class="dep">' + inuse.slice(0, 5).map(p => '<li>' + esc(p.label) + ': ' + esc(usesOf(p.id).filter(u => u.strong).map(u => u.txt).join(', ')) + '</li>').join('') + '</ul>Removing it can leave that function unavailable.</div>';
+  if (aff.size) body += '<div class="box warn"><b>' + aff.size + ' installed app' + (aff.size > 1 ? 's need' : ' needs') + ' ' + (targets.length > 1 ? 'these' : 'this') + '</b><ul class="dep">' + [...aff.keys()].slice(0, 6).map(i => '<li>' + esc(S.byId.get(i).label) + (aff.get(i) > 1 ? ' <span class="mut">(indirectly)</span>' : '') + '</li>').join('') + (aff.size > 6 ? '<li class="mut">…and ' + (aff.size - 6) + ' more</li>' : '') + '</ul></div>';
+  if (peerWarn.length) body += '<div class="box warn">' + peerWarn.slice(0, 3).map(x => esc(x[0].label) + ' shares a user ID with ' + esc(x[1].slice(0, 3).map(nodeName).join(', ')) + (x[1].length > 3 ? '…' : '') + ', so they break together.').join('<br>') + '</div>';
+  if (kind === 'sysrm') {
+    body += '<div class="box">If the device fails to boot 3 times in a row, D-bloater undoes the newest systemless removal automatically. ' + (S.opt.backup ? 'A copy of each app folder is saved first.' : 'No backup is made (turn on Settings, Backups).') + '</div>';
+    // Dry run: exactly which folder is hidden and how
+    const plan = [];
+    try {
+      const ids = targets.map(p => p.id).filter(x => /^[\w.]+$/.test(x));
+      for (let i = 0; i < ids.length; i += 15) {
+        const r = await exec(BIN + ' plan ' + ids.slice(i, i + 15).join(' '));
+        r.stdout.split('\n').forEach(l => { const f = l.split('|'); if (f[0] === 'PLAN' || f[0] === 'ERR') plan.push(f); });
+      }
+    } catch (e) { /* the real run still validates */ }
+    if (plan.length) {
+      const nomap = plan.some(f => f[0] === 'PLAN' && /NO metamodule/.test(f[3] || ''));
+      body += '<div class="box"><b>Dry run</b><ul class="dep">' + plan.slice(0, 8).map(f => {
+        const p = S.byId.get(f[1]);
+        return '<li>' + esc(p ? p.label : f[1]) + '<br><span class="mut">' + (f[0] === 'PLAN' ? esc(f[2]) + '<br>' + esc(f[3]) : '<span class="r-unsafe">refused: ' + esc(f[2]) + '</span>') + '</span></li>';
+      }).join('') + (plan.length > 8 ? '<li class="mut">…and ' + (plan.length - 8) + ' more</li>' : '') + '</ul></div>';
+      if (nomap) body += '<div class="box bad">⚠ No metamodule is installed, so this removal will not apply. Install NoMount first.</div>';
+    }
+  }
 
   const ok = await confirmDlg({
     title: A.label + '?', body, ok: A.label, cls: A.cls,
-    ack: kind === 'restore' ? '' : (crit.length ? 'I understand disabling critical system components can make the device unusable.' : (unsafe.length ? 'I understand rated-Unsafe packages can break the system or cause a bootloop.' : ''))
+    ack: kind === 'restore' ? '' : (crit.length ? 'I understand disabling critical system components can make the device unusable.' : (unsafe.length ? 'I understand rated-Unsafe packages can break the system or cause a bootloop.' : (inuse.length ? 'I understand this app is in use right now (launcher, phone, SMS or keyboard) and that function may stop working.' : '')))
   });
   if (!ok) return;
 
@@ -921,17 +1277,24 @@ async function act(kind, ids) {
   targets.forEach(p => { const c = kind === 'restore' ? restoreCmd(p) : kind; (groups[c] = groups[c] || []).push(p.id); });
   busy(A.label + '…');
   let good = 0, bad = [];
+  const badIds = [];
+  // Switching a queued or failed systemless removal to Disable / Uninstall drops the queued removal first
+  if (kind === 'disable' || kind === 'uninstall') {
+    const q = targets.filter(p => p.state === 'sysrm-pending' || p.state === 'sysrm-failed').map(p => p.id);
+    if (q.length) groups.sysunrm = q;
+  }
   try {
-    for (const c of Object.keys(groups)) {
+    for (const c of ['sysunrm'].concat(Object.keys(groups).filter(k => k !== 'sysunrm'))) {
+      if (!groups[c]) continue;
       const list = groups[c];
       for (let i = 0; i < list.length; i += 15) {
         const chunk = list.slice(i, i + 15).filter(x => /^[\w.]+$/.test(x));
         if (!chunk.length) continue;
-        const r = await exec(BIN + ' ' + c + ' ' + chunk.join(' '));
+        const r = await exec((c === 'sysrm' && S.opt.backup ? 'DBL_BACKUP=1 ' : '') + BIN + ' ' + c + ' ' + chunk.join(' '));
         r.stdout.split('\n').forEach(l => {
           const f = l.split('|');
-          if (f[0] === 'OK') { good++; S.sel.delete(f[1]); }
-          else if (f[0] === 'ERR') bad.push(f[1] + ': ' + (f[2] || 'failed'));
+          if (f[0] === 'OK') { if (c !== 'sysunrm' || kind === 'restore') good++; S.sel.delete(f[1]); }
+          else if (f[0] === 'ERR') { bad.push(f[1] + ': ' + (f[2] || 'failed')); if (/^[\w.]+$/.test(f[1])) badIds.push(f[1]); }
         });
         if (r.errno !== 0 && !r.stdout) bad.push('shell error: ' + (r.stderr || r.errno));
       }
@@ -940,9 +1303,49 @@ async function act(kind, ids) {
   busy(null);
   await scan();
   if (bad.length) {
-    sheet('<h2>' + good + ' done, ' + bad.length + ' failed</h2><div class="box bad">' + bad.slice(0, 12).map(esc).join('<br>') + (bad.length > 12 ? '<br>…' : '') + '</div><div class="row"><button class="btn pri" id="eOk">OK</button></div>');
+    // A systemless removal that failed can still be done another way
+    const alt = kind === 'sysrm' ? [...new Set(badIds)].filter(i => S.byId.has(i)) : [];
+    const altU = alt.filter(i => !S.byId.get(i).protected && ACTS.uninstall.ok(S.byId.get(i).state));
+    const altD = alt.filter(i => ACTS.disable.ok(S.byId.get(i).state));
+    sheet('<h2>' + good + ' done, ' + bad.length + ' failed</h2><div class="box bad">' + bad.slice(0, 12).map(esc).join('<br>') + (bad.length > 12 ? '<br>…' : '') + '</div>' +
+      (alt.length ? '<p>Systemless removal did not work for ' + (alt.length > 1 ? 'these apps' : 'this app') + '. You can do it another way:</p>' : '') +
+      '<div class="row">' +
+      (altD.length ? '<button class="btn warn" id="eDis">Disable ' + altD.length + '</button>' : '') +
+      (altU.length ? '<button class="btn bad" id="eUni">Uninstall ' + altU.length + '</button>' : '') +
+      '<button class="btn pri" id="eOk">OK</button></div>');
     $('#eOk').onclick = closeSheet;
+    if (altD.length) $('#eDis').onclick = () => { closeSheet(); act('disable', altD); };
+    if (altU.length) $('#eUni').onclick = () => { closeSheet(); act('uninstall', altU); };
   } else toast(good + ' package' + (good === 1 ? '' : 's') + ' updated' + (kind === 'sysrm' || (kind === 'restore' && targets.some(p => p.state.indexOf('sysrm') === 0)) ? ', reboot to apply' : ''));
+}
+
+async function doSoftReboot() {
+  const ok = await confirmDlg({title: 'Restart the framework?', body: '<p>Restarts Android\'s system process without a full reboot so queued systemless removals apply. The screen goes dark for a few seconds and apps restart. If it does not come back, hold power to reboot.</p>', ok: 'Restart', cls: 'warn'});
+  if (!ok) return;
+  if (!HAS_KSU) { toast('Demo mode: restart skipped.'); return; }
+  let r;
+  try { r = await exec(BIN + ' softreboot'); } catch (e) { return; } // the restart can cut the connection
+  const f = (r && r.stdout || '').trim().split('\n')[0].split('|');
+  if (f[0] === 'ERR') toast(f[2] || 'Soft reboot failed. Use a full reboot.');
+}
+
+async function doBackup() {
+  busy('Copying backups…');
+  let r;
+  try { r = await exec(BIN + ' backup'); } catch (e) { r = {stdout: 'ERR|backup|' + (e.message || e)}; }
+  busy(null);
+  const f = (r.stdout || '').trim().split('\n')[0].split('|');
+  toast(f[0] === 'OK' ? f[2] : 'Backup failed: ' + (f[2] || 'unknown error'));
+}
+
+async function doBackupRestore(id) {
+  busy('Reinstalling…');
+  let r;
+  try { r = await exec(BIN + ' backuprestore ' + id); } catch (e) { r = {stdout: 'ERR|' + id + '|' + (e.message || e)}; }
+  busy(null);
+  const f = (r.stdout || '').trim().split('\n')[0].split('|');
+  toast(f[0] === 'OK' ? 'Reinstalled from backup.' : 'Failed: ' + (f[2] || 'unknown error'));
+  await scan();
 }
 
 async function doReboot() {
@@ -956,6 +1359,29 @@ async function showLog() {
   const r = await exec(BIN + ' log');
   sheet('<h2>Action log</h2><pre class="log">' + esc(r.stdout || '(empty)') + '</pre><div class="row"><button class="btn pri" id="lOk">Close</button></div>');
   $('#lOk').onclick = closeSheet;
+}
+
+function openFailed() {
+  const ps = S.pkgs.filter(p => p.state === 'sysrm-failed');
+  if (!ps.length) { closeSheet(); return; }
+  const dis = ps.map(p => p.id), uni = ps.filter(p => !p.protected).map(p => p.id);
+  sheet('<h2>Systemless removal not applied</h2><p>These apps are still installed after the reboot. Pick another way to remove them, or cancel the removal.</p>' +
+    '<div class="box"><ul class="dep">' + ps.slice(0, 12).map(p => '<li>' + esc(p.label) + ' <span class="mut">' + esc(p.id) + '</span></li>').join('') + (ps.length > 12 ? '<li class="mut">…and ' + (ps.length - 12) + ' more</li>' : '') + '</ul></div>' +
+    '<div class="row"><button class="btn warn" id="fDis">Disable ' + dis.length + '</button>' + (uni.length ? '<button class="btn bad" id="fUni">Uninstall ' + uni.length + '</button>' : '') +
+    '<button class="btn" id="fCan">Cancel removal</button><button class="btn" id="fDiag">Diagnose</button><button class="btn" id="fOk">Close</button></div>');
+  $('#fOk').onclick = closeSheet;
+  $('#fDis').onclick = () => { closeSheet(); act('disable', dis); };
+  if (uni.length) $('#fUni').onclick = () => { closeSheet(); act('uninstall', uni); };
+  $('#fCan').onclick = () => { closeSheet(); act('restore', dis); };
+  $('#fDiag').onclick = () => { closeSheet(); showDiag(); };
+}
+async function showDiag() {
+  busy('Checking…');
+  let r;
+  try { r = await exec(BIN + ' diag'); } catch (e) { r = {stdout: 'failed: ' + (e.message || e)}; }
+  busy(null);
+  sheet('<h2>Systemless diagnostics</h2><pre class="log">' + esc(r.stdout || '(empty)') + '</pre><div class="row"><button class="btn pri" id="dOk">Close</button></div>');
+  $('#dOk').onclick = closeSheet;
 }
 
 async function restoreAll() {
@@ -982,20 +1408,23 @@ document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.hid
 menu.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
   menu.hidden = true;
   const m = b.dataset.m;
-  if (m === 'update') openProviders();
+  if (m === 'settings') openSettings();
+  else if (m === 'update') openProviders();
   else if (m === 'export') openExport();
   else if (m === 'import') openImport();
   else if (m === 'selsafe') { visible().forEach(p => { if (p.risk === 'safe' && p.state === 'enabled') S.sel.add(p.id); }); renderList(); renderBar(); }
   else if (m === 'selnone') { S.sel.clear(); renderList(); renderBar(); }
   else if (m === 'crit') { S.showCritical = !S.showCritical; render(); }
   else if (m === 'log') showLog();
+  else if (m === 'diag') showDiag();
+  else if (m === 'backup') doBackup();
   else if (m === 'restoreall') restoreAll();
   else if (m === 'reboot') doReboot();
 });
 
 fillSelect('#fState', [['all', 'Any state'], ['enabled', 'Enabled'], ['disabled', 'Disabled'], ['removed', 'Uninstalled'], ['sysrm', 'Systemless']], 'all');
 fillSelect('#fList', [['all', 'All lists'], ['google', 'Google'], ['aosp', 'AOSP'], ['oem', 'OEM'], ['carrier', 'Carrier'], ['misc', 'Misc'], ['unlisted', 'Unlisted']], 'all');
-fillSelect('#fSort', Object.keys(SORTS).map(k => [k, 'Sort: ' + SORTS[k][0]]), 'name');
+syncSort();
 $('#mode').textContent = HAS_KSU ? 'KernelSU' : 'demo mode (no KernelSU bridge)';
 renderChips();
 buildDb();

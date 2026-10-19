@@ -18,6 +18,15 @@ if [ -d "$OLD/system" ]; then
   cp -af "$OLD/system" "$MODPATH/" 2>/dev/null && ui_print "- Kept existing systemless removals"
 fi
 
+# Records from older versions carry no boot id; stamp them so the WebUI can
+# tell "pending a reboot" from "rebooted but not applied"
+BID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+for f in /data/adb/dbloater/sysrm/*; do
+  [ -f "$f" ] || continue
+  { read -r _d; read -r _b; } < "$f"
+  [ -n "$_b" ] || { echo "$_d"; echo "$BID"; } > "$f"
+done
+
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/bin/dbl.sh" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755

@@ -1,6 +1,6 @@
 id=dbloater
 name=D-bloater
-version=v1.2.0
-versionCode=4
+version=v1.4.1
+versionCode=7
 author=zennnez
 description=WebUI debloater for system apps: risk ratings, filters, disable / uninstall / systemless removal, with one-tap restore.
