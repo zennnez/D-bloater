@@ -120,4 +120,7 @@ o=$($D diag); has "$o" "NoMount rule" "diag runs"
 $D sysunrm com.foo.app >/dev/null
 [ ! -f "$T/data/backup/com.foo.app.tar" ] && ok "sysunrm drops backup" || bad "sysunrm backup"
 
+$D delbackup com.foo.app >/dev/null
+[ ! -f "$T/x/backup/com.foo.app.tar" ] && ok "delbackup removes archive" || bad "delbackup failed"
+
 [ $FAIL = 0 ] && echo "ALL PASSED" || { echo "FAILURES"; exit 1; }

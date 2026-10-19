@@ -4,3 +4,4 @@ version=v1.4.2
 versionCode=8
 author=zennnez
 description=WebUI debloater for system apps: risk ratings, filters, disable / uninstall / systemless removal, with one-tap restore.
+updateJson=https://raw.githubusercontent.com/zennnez/D-bloater/main/update.json

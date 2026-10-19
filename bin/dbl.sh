@@ -324,6 +324,12 @@ do_writefile() {
   fi
 }
 
+# delbackup <pkg>: remove the saved APK archive
+do_delbackup() {
+  rm -f "$DATA/backup/$1.tar" "$XDIR/backup/$1.tar"
+  res OK "$1" "backup deleted"
+}
+
 do_scan() {
   echo "##ALL"
   pm list packages --user 0 -s -f -u 2>/dev/null
@@ -338,6 +344,12 @@ do_scan() {
     [ -f "$f" ] || continue
     { read -r _d; read -r _b; } < "$f"
     echo "${f##*/} $_d $_b"
+  done
+  echo "##BACKUP"
+  for _f in "$DATA"/backup/*.tar "$XDIR"/backup/*.tar; do
+    [ -f "$_f" ] || continue
+    _bname=${_f##*/}
+    echo "${_bname%.tar}"
   done
   echo "##END"
 }
@@ -594,7 +606,7 @@ case "$cmd" in
   graph) do_graph ;;
   backup) do_backup ;;
   diag) do_diag ;;
-  disable|enable|uninstall|restore|sysrm|sysunrm|plan|backuprestore)
+  disable|enable|uninstall|restore|sysrm|sysunrm|plan|backuprestore|delbackup)
     for p in "$@"; do
       if ! valid "$p"; then
         res ERR "$p" "invalid package name"
@@ -617,9 +629,10 @@ case "$cmd" in
         sysunrm) do_sysunrm "$p" ;;
         plan) do_plan "$p" ;;
         backuprestore) do_backuprestore "$p" ;;
+        delbackup) do_delbackup "$p" ;;
       esac
     done ;;
   *)
-    echo "usage: dbl.sh scan|info|running|disable|enable|uninstall|restore|sysrm|sysunrm|restoreall|reapply|diag|plan|softreboot|backup|backuprestore|usage|graph|log|files|readfile|writefile [args...]" >&2
+    echo "usage: dbl.sh scan|info|running|disable|enable|uninstall|restore|sysrm|sysunrm|delbackup|restoreall|reapply|diag|plan|softreboot|backup|backuprestore|usage|graph|log|files|readfile|writefile [args...]" >&2
     exit 2 ;;
 esac
