@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.2 (2026-10-28)
+
+- v1.5.2 (3922c8e)
+- Remove stale partition overlay directories (b0fcd59)
+- Update CHANGELOG.md and update.json for v1.5.1 [skip ci] (c7e7e6b)
+
 ## v1.5.1 (2026-10-19)
 
 - v1.5.1 (3f569c3)
