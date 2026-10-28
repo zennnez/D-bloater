@@ -16,8 +16,8 @@ mkdir -p /data/adb/dbloater/sysrm
 OLD=/data/adb/modules/dbloater
 if [ -d "$OLD/system" ]; then
   cp -af "$OLD/system" "$MODPATH/" 2>/dev/null && ui_print "- Kept existing systemless removals"
-  # Purge any dangling symlinks from older versions that broke partition overlays
-  rm -f "$MODPATH/system/product" "$MODPATH/system/system_ext" "$MODPATH/system/vendor" 2>/dev/null
+  # Purge any dangling partition overlay directories that break partition mounts
+  rm -rf "$MODPATH/system/product" "$MODPATH/system/system_ext" "$MODPATH/system/vendor" "$MODPATH/system/odm" "$MODPATH/system/my_"* 2>/dev/null
 fi
 
 # Ensure /system/bin/dbl wrapper exists so CLI works in PATH and NoMount detects module as ACTIVE
