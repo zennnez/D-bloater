@@ -16,8 +16,8 @@ if [ "$CNT" -ge 3 ] && ls "$DATA/sysrm/"* >/dev/null 2>&1; then
   sh "$MODDIR/bin/dbl.sh" revertlast >/dev/null 2>&1
 fi
 
-# Purge dangling partition symlinks if any exist
-rm -f "$MODDIR/system/product" "$MODDIR/system/system_ext" "$MODDIR/system/vendor" 2>/dev/null
+# Purge dangling partition overlay directories that mask SAR partitions
+rm -rf "$MODDIR/system/product" "$MODDIR/system/system_ext" "$MODDIR/system/vendor" "$MODDIR/system/odm" "$MODDIR/system/my_"* 2>/dev/null
 
 # Ensure system/bin/dbl wrapper is ready so CLI works and NoMount identifies module as active
 [ -x "$MODDIR/system/bin/dbl" ] || {
